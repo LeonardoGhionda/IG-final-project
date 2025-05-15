@@ -9,30 +9,35 @@
 #include "camera.h"
 #include "model.h"
 #include "ingredient.h"
+#include "printvec.h"
+#include "screen.h"
 
 #include <iostream>
+
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 
-// settings
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
+//Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+float lastX = screen.w / 2.0f;
+float lastY = screen.h / 2.0f;
 bool firstMouse = true;
 
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+
+
 int main()
 {
+    srand(static_cast<unsigned int>(time(0)));
+
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -46,7 +51,7 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Model_Loader", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(screen.w, screen.h, "Model_Loader", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -59,7 +64,7 @@ int main()
     glfwSetScrollCallback(window, scroll_callback);
 
     // tell GLFW to capture our mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -83,7 +88,9 @@ int main()
     // load models
     // -----------
     Model backgroundPlane("resources/background/background.obj");
-    Ingredient ball("resources/ball/ball.obj");
+    glm::vec2 randomizer = glm::vec2((rand() % 2) == 0 ? -1 : 1, (rand() % 2) == 0 ? -1 : 1);
+    Ingredient ball("resources/ball/ball.obj", screen.screenlimit * randomizer * 1.0f);
+    
 
 
     // draw in wireframe
@@ -119,26 +126,27 @@ int main()
 
         glDisable(GL_DEPTH_TEST);
         //background plane rendered in otho 
-        glm::mat4 orthoProjection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, -10.0f, 10.0f);
+        glm::mat4 orthoProjection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
         ourShader.setMat4("projection", orthoProjection);
         ourShader.setMat4("view", glm::mat4(1.0f));
 
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(SCR_WIDTH / 2.0f, SCR_HEIGHT / 2.0f, 0.0f));
-        model = glm::scale(model, glm::vec3(SCR_WIDTH / 3.2f, SCR_HEIGHT / 1.8f, 1.0f));
+        model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
 
         ourShader.setMat4("model", model);
         backgroundPlane.Draw(ourShader);
         glEnable(GL_DEPTH_TEST);
 
         // render the ball with perspective projecion
-        glm::mat4 perspectiveProjection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 perspectiveProjection = glm::perspective(/*glm::radians(camera.Zoom)*/ FOV, (float)screen.w / (float)screen.h, 0.1f, 100.0f);
         //glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 16.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 view = glm::lookAt(CAMERA_POS, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         ourShader.setMat4("projection", perspectiveProjection);
         ourShader.setMat4("view", view);
-        ourShader.setMat4("model", ball.getModelMatrix());
-        ball.move(glm::vec2(1.0, 2.0), 1.0f);
+        ourShader.setMat4("model", ball.GetModelMatrix());
+        //ball.Move(glm::vec2(1.0, 2.0), 1.0f);
+        //std::cout<<ball.MCSPosition(perspectiveProjection, view)<<std::endl;
         ball.Draw(ourShader);
 
 
@@ -158,12 +166,16 @@ int main()
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow* window)
 {
+    /*
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS && glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    */
 
+    //Camera movement
+    /*
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -172,7 +184,7 @@ void processInput(GLFWwindow* window)
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
-
+    */
 
 
     //fullscreen
@@ -181,9 +193,13 @@ void processInput(GLFWwindow* window)
         GLFWmonitor* monitor = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
         glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
+
+        screen.w = mode->width;
+        screen.h = mode->height;
     }
     if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
-        glfwSetWindowMonitor(window, NULL, 100, 100, SCR_WIDTH, SCR_HEIGHT, 0);
+        screen.resetSize();
+        glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
     }
 }
 
@@ -194,18 +210,34 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     // make sure the viewport matches the new window dimensions; note that width and 
     // height will be significantly larger than specified on retina displays.
 
-    if (width * 9 > height * 16)
+    if (width * screen.ARH > height * screen.ARW)
     {
-        int viewport_width = (int)((double)height * 16.0 / 9.0);
+        int viewport_width = (int)((double)height * screen.ARW / screen.ARH);
         int padding = (width - viewport_width) / 2;
         glViewport(0 + padding, 0, viewport_width, height);
+        //update scren values
+        screen.w = viewport_width;
+        screen.paddingW = padding;
+        screen.h = height;
+        screen.paddingH = 0;
     }
     else
     {
-        int viewport_height = (int)((double)width * 9.0 / 16.0);
+        int viewport_height = (int)((double)width * screen.ARH / screen.ARW );
         int padding = (height - viewport_height) / 2;
         glViewport(0, 0 + padding, width, viewport_height);
+        //update scren values
+        screen.w = width;
+        screen.paddingW = 0;
+        screen.h = viewport_height;
+        screen.paddingH = padding;
     }
+}
+
+float clampToUnitRange(float value) {
+    if (value < 0) return 0;
+    if (value > 1) return 1;
+    return value;
 }
 
 // glfw: whenever the mouse moves, this callback is called
@@ -215,6 +247,15 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
 
+    float xval = clampToUnitRange((xpos - screen.paddingW) / screen.w);
+    float yval = clampToUnitRange((ypos - screen.paddingH) / screen.h);
+
+    //std::cout << ptr->hit(glm::vec2(xpos, ypos), *p, *v) << std::endl;
+
+    //printf("%f | %f\n", xval, yval);
+
+/*
+    //CAMERA MOVEMENT FUNCTION
     if (firstMouse)
     {
         lastX = xpos;
@@ -228,11 +269,10 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     lastX = xpos;
     lastY = ypos;
 
-    
-        //CAMERA MOVEMENT FUNCTION
-
-        if(glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED)
-            camera.ProcessMouseMovement(xoffset, yoffset);
+    if(glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED)
+        camera.ProcessMouseMovement(xoffset, yoffset);
+*/
+   
     
 }
 

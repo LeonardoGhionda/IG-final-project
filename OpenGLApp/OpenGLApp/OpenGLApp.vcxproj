@@ -152,6 +152,8 @@
     <ClInclude Include="ingredient.h" />
     <ClInclude Include="mesh.h" />
     <ClInclude Include="model.h" />
+    <ClInclude Include="printvec.h" />
+    <ClInclude Include="screen.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="stb_image.h" />
   </ItemGroup>

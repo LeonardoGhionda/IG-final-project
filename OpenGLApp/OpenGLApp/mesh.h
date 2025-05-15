@@ -13,6 +13,8 @@
 #include <cstdlib>
 #include <ctime>
 
+
+
 using namespace std;
 
 #define MAX_BONE_INFLUENCE 4
@@ -74,7 +76,6 @@ public:
         bool hasTexture = textures.size() > 0;
         shader.setBool("hasTexture", hasTexture);
         if (!hasTexture) {
-            std::srand(static_cast<unsigned>(std::time(nullptr)));
 
             float min = 0.0f;
             float max = 1.0f;
@@ -123,6 +124,15 @@ public:
         // always good practice to set everything back to defaults once configured.
         glActiveTexture(GL_TEXTURE0);
     }
+
+    glm::vec3 getModelAveragePosition() const {
+        glm::vec3 sum(0.0f);
+        for (const auto& v : vertices) {
+            sum += v.Position;
+        }
+        return sum / static_cast<float>(vertices.size());
+    }
+
 
 private:
     // render data 

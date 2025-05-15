@@ -44,6 +44,12 @@
     <ClInclude Include="ingredient.h">
       <Filter>File di intestazione</Filter>
     </ClInclude>
+    <ClInclude Include="printvec.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="screen.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader.fs">

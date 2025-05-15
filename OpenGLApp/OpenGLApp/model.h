@@ -45,6 +45,14 @@ public:
             meshes[i].Draw(shader);
     }
 
+    glm::vec3 getModelAveragePosition() {
+        glm::vec3 sum(0.0f);
+        for (const auto &m : meshes) {
+            sum += m.getModelAveragePosition();
+        }
+        return sum / static_cast<float>(meshes.size());
+    }
+
 private:
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
     void loadModel(string const& path)
@@ -101,6 +109,7 @@ private:
             vector.y = mesh->mVertices[i].y;
             vector.z = mesh->mVertices[i].z;
             vertex.Position = vector;
+
             // normals
             if (mesh->HasNormals())
             {

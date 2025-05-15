@@ -11,6 +11,8 @@
 #endif
 #include <cstddef>
 
+
+
 namespace glm
 {
 	template<typename T, qualifier Q>
