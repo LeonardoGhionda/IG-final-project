@@ -9,7 +9,7 @@
 #include "camera.h"
 #include "model.h"
 #include "ingredient.h"
-#include "printvec.h"
+#include "vecplus.h"
 #include "screen.h"
 
 #include <iostream>
@@ -93,6 +93,7 @@ int main()
 
     std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
     std::uniform_int_distribution<int> coin(0, 1);
+    std::uniform_real_distribution<float> angle(-15.0f, 15.0f);
 
     float r = dist(gen);
     glm::vec2 dir = (coin(gen) == 0)
@@ -100,9 +101,10 @@ int main()
         : glm::vec2(r, (coin(gen) == 0 ? -1 : 1));
 
     glm::vec2 spawnPos = screen.screenlimit * dir;
-    spawnPos = screen.screenlimit * glm::vec2(-1.0f, -1.0f);
+    //spawnPos = screen.screenlimit * glm::vec2(-1.0f, -1.0f); //comment for random spawn position
     Ingredient ball("resources/ball/ball.obj", spawnPos);
-    ball.AddVelocity(glm::vec2(5.0f, 25.0f));
+    glm::vec2 direction = RotateVec2(glm::normalize(-spawnPos), glm::radians(angle(gen)));
+    ball.AddVelocity(direction * 25.0f);
 
 
     // draw in wireframe

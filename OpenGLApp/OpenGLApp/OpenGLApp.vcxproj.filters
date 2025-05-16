@@ -44,7 +44,7 @@
     <ClInclude Include="ingredient.h">
       <Filter>File di intestazione</Filter>
     </ClInclude>
-    <ClInclude Include="printvec.h">
+    <ClInclude Include="vecplus.h">
       <Filter>File di intestazione</Filter>
     </ClInclude>
     <ClInclude Include="screen.h">
