@@ -13,6 +13,7 @@
 #include "screen.h"
 
 #include <iostream>
+#include <random>
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -36,7 +37,8 @@ float lastFrame = 0.0f;
 
 int main()
 {
-    srand(static_cast<unsigned int>(time(0)));
+    std::random_device rd;
+    std::mt19937 gen(rd());
 
     // glfw: initialize and configure
     // ------------------------------
@@ -88,9 +90,19 @@ int main()
     // load models
     // -----------
     Model backgroundPlane("resources/background/background.obj");
-    glm::vec2 randomizer = glm::vec2((rand() % 2) == 0 ? -1 : 1, (rand() % 2) == 0 ? -1 : 1);
-    Ingredient ball("resources/ball/ball.obj", screen.screenlimit * randomizer * 1.0f);
-    
+
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+    std::uniform_int_distribution<int> coin(0, 1);
+
+    float r = dist(gen);
+    glm::vec2 dir = (coin(gen) == 0)
+        ? glm::vec2((coin(gen) == 0 ? -1 : 1), r)
+        : glm::vec2(r, (coin(gen) == 0 ? -1 : 1));
+
+    glm::vec2 spawnPos = screen.screenlimit * dir;
+    spawnPos = screen.screenlimit * glm::vec2(-1.0f, -1.0f);
+    Ingredient ball("resources/ball/ball.obj", spawnPos);
+    ball.AddVelocity(glm::vec2(5.0f, 25.0f));
 
 
     // draw in wireframe
@@ -146,6 +158,8 @@ int main()
         ourShader.setMat4("view", view);
         ourShader.setMat4("model", ball.GetModelMatrix());
         //ball.Move(glm::vec2(1.0, 2.0), 1.0f);
+        //ball.MoveToCenter(2.0f);
+        ball.Move();
         //std::cout<<ball.MCSPosition(perspectiveProjection, view)<<std::endl;
         ball.Draw(ourShader);
 

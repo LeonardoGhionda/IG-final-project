@@ -8,6 +8,8 @@
 
 #include "shader.h"
 
+#include "random"
+
 #include <string>
 #include <vector>
 #include <cstdlib>
@@ -79,10 +81,13 @@ public:
 
             float min = 0.0f;
             float max = 1.0f;
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_real_distribution<float> dist(min, max);
 
-            float r1 = min + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (max - min);
-            float r2 = min + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (max - min);
-            float r3 = min + static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * (max - min);
+            float r1 = dist(gen);
+            float r2 = dist(gen);
+            float r3 = dist(gen);
             shader.setVec3("colorCoeff", r1, r2, r3);
         }
         //-----------------

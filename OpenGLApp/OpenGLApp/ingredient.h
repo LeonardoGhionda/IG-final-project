@@ -4,11 +4,14 @@
 #include "shader.h"
 #include "printvec.h"
 
+#define G glm::vec2(0.0f, -25.0f)
+
 
 class Ingredient {
 public:
     Ingredient(const char* path, glm::vec2 spawnpoint) : model(path), mat(1.0f) {
         mat = glm::translate(mat, glm::vec3(spawnpoint, 0.0f));
+        position = spawnpoint;
         mat = glm::scale(mat, glm::vec3(1.0f));	
         time = static_cast<float>(glfwGetTime());
 
@@ -22,17 +25,30 @@ public:
             }
         }
         CHB = std::sqrt(CHBSq);
+        velocity = glm::vec2(0.0f);
     }
 
-    void Draw(Shader shader) { model.Draw(shader); }
+    void Draw(Shader shader) { 
+        model.Draw(shader); 
+    }
 
     glm::mat4 GetModelMatrix() { return mat; }
 
-    void Move(glm::vec2 offset, float speed) {
-        glm::vec3 offset3 = glm::normalize(glm::vec3(offset, 0.0f));
-        float new_time = static_cast<float>(glfwGetTime());
-        mat = glm::translate(mat, offset3 * speed * (new_time - time));
-        time = new_time;
+    void Move() {
+        ApplyGravity();
+        float deltaTime = static_cast<float>(glfwGetTime()) - time;
+        position += velocity * deltaTime;
+        mat = glm::translate(glm::mat4(1.0f), glm::vec3(position, 0.0f));
+        updateTime();
+    }
+
+    void ApplyGravity() {
+        float deltaTime = static_cast<float>(glfwGetTime()) - time;
+        velocity += G * deltaTime;
+    }
+
+    void AddVelocity(glm::vec2 delta) {
+        velocity += delta;
     }
 
     //center position in world space 
@@ -64,6 +80,7 @@ public:
         return glm::distance(mousePos, pos) <= CHB_MCS(projection, view);
     }
 
+   
 private:
     Model model;
     glm::mat4 mat;
@@ -71,6 +88,9 @@ private:
     float CHB; //radius of a circular hitbox
     float pCHB = -1; //radius of a circular hitbox projcted in MCS 
     glm::vec3 center;  //average center position Model matrix independent
+    glm::vec2 position;
+    glm::vec2 velocity;
+
 
     float CHB_MCS(glm::mat4 projection, glm::mat4 view) {
 
@@ -85,5 +105,9 @@ private:
             (1.0f - (offset.y / offset.w + 1.0f) * 0.5f) * 720);
 
         return glm::length(screenOffset - screenCenter);
+    }
+
+    void updateTime() {
+        time = static_cast<float>(glfwGetTime());
     }
 };
