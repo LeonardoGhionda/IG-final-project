@@ -11,17 +11,15 @@
 #include "ingredient.h"
 #include "vecplus.h"
 #include "screen.h"
+#include "keys.h"
 
 #include <iostream>
 #include <random>
-
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
-
-
 
 // camera
 //Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -33,7 +31,9 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+glm::vec2 mousePos = glm::vec2(0.0f);
 
+Keys keys;
 
 int main()
 {
@@ -104,13 +104,10 @@ int main()
     //spawnPos = screen.screenlimit * glm::vec2(-1.0f, -1.0f); //comment for random spawn position
     Ingredient ball("resources/ball/ball.obj", spawnPos);
     glm::vec2 direction = RotateVec2(glm::normalize(-spawnPos), glm::radians(angle(gen)));
-    ball.AddVelocity(direction * 25.0f);
-
+    ball.AddVelocity(direction * 5.0f);
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-
 
     glDisable(GL_CULL_FACE);
     //glCullFace(GL_BACK); // Cull back faces
@@ -165,11 +162,18 @@ int main()
         //std::cout<<ball.MCSPosition(perspectiveProjection, view)<<std::endl;
         ball.Draw(ourShader);
 
+        
+        if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
+            if (ball.hit(mousePos, perspectiveProjection, view)) {
+                printf("hit");
+            }
+        }
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
+        keys.Update(window);
     }
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
@@ -262,6 +266,8 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 {
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
+
+    mousePos = glm::vec2(xpos, ypos);
 
     float xval = clampToUnitRange((xpos - screen.paddingW) / screen.w);
     float yval = clampToUnitRange((ypos - screen.paddingH) / screen.h);

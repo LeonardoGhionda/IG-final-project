@@ -4,7 +4,7 @@
 #include "shader.h"
 #include "vecplus.h"
 
-#define G glm::vec2(0.0f, -25.0f)
+#define G glm::vec2(0.0f, -5.0f)
 
 
 class Ingredient {

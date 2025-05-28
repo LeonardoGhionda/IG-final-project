@@ -50,6 +50,9 @@
     <ClInclude Include="screen.h">
       <Filter>File di intestazione</Filter>
     </ClInclude>
+    <ClInclude Include="keys.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader.fs">
