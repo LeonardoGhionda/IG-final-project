@@ -15,6 +15,7 @@
 
 #include <iostream>
 #include <random>
+#include <deque>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -35,10 +36,12 @@ glm::vec2 mousePos = glm::vec2(0.0f);
 
 Keys keys;
 
+std::random_device rd;
+std::mt19937 gen(rd());
+
 int main()
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    
 
     // glfw: initialize and configure
     // ------------------------------
@@ -91,20 +94,16 @@ int main()
     // -----------
     Model backgroundPlane("resources/background/background.obj");
 
-    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-    std::uniform_int_distribution<int> coin(0, 1);
-    std::uniform_real_distribution<float> angle(-15.0f, 15.0f);
 
-    float r = dist(gen);
-    glm::vec2 dir = (coin(gen) == 0)
-        ? glm::vec2((coin(gen) == 0 ? -1 : 1), r)
-        : glm::vec2(r, (coin(gen) == 0 ? -1 : 1));
+    deque<Ingredient> ingredients;
+    ingredients.push_back(Ingredient("resources/ball/ball.obj", Ingredient::RandomSpawnPoint()));
+    ingredients.push_back(Ingredient("resources/ball/ball.obj", Ingredient::RandomSpawnPoint()));
+    ingredients.push_back(Ingredient("resources/ball/ball.obj", Ingredient::RandomSpawnPoint()));
+    ingredients.push_back(Ingredient("resources/ball/ball.obj", Ingredient::RandomSpawnPoint()));
 
-    glm::vec2 spawnPos = screen.screenlimit * dir;
-    //spawnPos = screen.screenlimit * glm::vec2(-1.0f, -1.0f); //comment for random spawn position
-    Ingredient ball("resources/ball/ball.obj", spawnPos);
-    glm::vec2 direction = RotateVec2(glm::normalize(-spawnPos), glm::radians(angle(gen)));
-    ball.AddVelocity(direction * 5.0f);
+    Ingredient* active = &ingredients[0]; //pointer to the current active ingredient
+    active->AddVelocity(active->getDirectionToCenter() * 5.0f);
+    
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -155,24 +154,28 @@ int main()
         glm::mat4 view = glm::lookAt(CAMERA_POS, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         ourShader.setMat4("projection", perspectiveProjection);
         ourShader.setMat4("view", view);
-        ourShader.setMat4("model", ball.GetModelMatrix());
-        //ball.Move(glm::vec2(1.0, 2.0), 1.0f);
-        //ball.MoveToCenter(2.0f);
-        ball.Move();
-        //std::cout<<ball.MCSPosition(perspectiveProjection, view)<<std::endl;
-        ball.Draw(ourShader);
 
-        
+        //drawing the firts ingredient in the list 
+        ourShader.setMat4("model", active->GetModelMatrix());
+        active->Move();
+        active->Draw(ourShader);
+
         if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
-            if (ball.hit(mousePos, perspectiveProjection, view)) {
-                printf("hit");
+            if (active->hit(mousePos, perspectiveProjection, view)) {
+                ingredients.pop_front();
+                if (ingredients.empty())
+                    break;
+                active = &ingredients[0];
+                active->AddVelocity(active->getDirectionToCenter() * 5.0f);
+                active->updateTime();
             }
         }
-
+                
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
+        //update pressed keys
         keys.Update(window);
     }
 
