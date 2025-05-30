@@ -36,6 +36,7 @@ struct Vertex {
     int m_BoneIDs[MAX_BONE_INFLUENCE];
     //weights from each bone
     float m_Weights[MAX_BONE_INFLUENCE];
+    glm::vec3 diffuseColor;
 };
 
 struct Texture {
@@ -52,14 +53,16 @@ public:
     vector<Texture>      textures;
     unsigned int VAO;
     bool vertex_modified;
+	glm::vec3 diffuseColor;
 
     // constructor
-    Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures)
-    {
+    Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures, glm::vec3 diffuseColor) {
         this->vertices = vertices;
         this->indices = indices;
         this->textures = textures;
         this->vertex_modified = false;
+        this->diffuseColor = diffuseColor;
+
 
         // now that we have all the required data, set the vertex buffers and its attribute pointers.
         setupMesh();
@@ -79,7 +82,7 @@ public:
         shader.setBool("hasTexture", hasTexture);
         if (!hasTexture) {
 
-            float min = 0.0f;
+            /*float min = 0.0f;
             float max = 1.0f;
             std::random_device rd;
             std::mt19937 gen(rd());
@@ -88,7 +91,8 @@ public:
             float r1 = dist(gen);
             float r2 = dist(gen);
             float r3 = dist(gen);
-            shader.setVec3("colorCoeff", r1, r2, r3);
+            shader.setVec3("colorCoeff", r1, r2, r3);*/
+            shader.setVec3("diffuseColor", diffuseColor);
         }
         //-----------------
 
