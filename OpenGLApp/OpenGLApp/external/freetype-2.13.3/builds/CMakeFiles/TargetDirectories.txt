@@ -1,0 +1,5 @@
+C:/Users/linaa/source/repos/LeonardoGhionda/IG-final-project/OpenGLApp/OpenGLApp/external/freetype-2.13.3/builds/CMakeFiles/freetype.dir
+C:/Users/linaa/source/repos/LeonardoGhionda/IG-final-project/OpenGLApp/OpenGLApp/external/freetype-2.13.3/builds/CMakeFiles/PACKAGE.dir
+C:/Users/linaa/source/repos/LeonardoGhionda/IG-final-project/OpenGLApp/OpenGLApp/external/freetype-2.13.3/builds/CMakeFiles/INSTALL.dir
+C:/Users/linaa/source/repos/LeonardoGhionda/IG-final-project/OpenGLApp/OpenGLApp/external/freetype-2.13.3/builds/CMakeFiles/ALL_BUILD.dir
+C:/Users/linaa/source/repos/LeonardoGhionda/IG-final-project/OpenGLApp/OpenGLApp/external/freetype-2.13.3/builds/CMakeFiles/ZERO_CHECK.dir
