@@ -5,7 +5,7 @@
 #include "vecplus.h"
 #include "screen.h"
 
-#define G glm::vec2(0.0f, -5.0f)
+#define G glm::vec2(0.0f, -3.0f)
 
 
 class Ingredient {
@@ -77,10 +77,8 @@ public:
 
         // Screen-space (pixel,  0 - width/height)
         glm::vec2 screenPos;
-        screenPos.x = (normalizedCS.x + 1.0f) * 0.5f * 1280;
-        screenPos.y = (normalizedCS.y + 1.0f) * 0.5f * 720;
-        //GLFW MCS has inverted y ax
-        screenPos.y = 720 - screenPos.y;
+        screenPos.x = (normalizedCS.x + 1.0f) * 0.5f * screen.w;
+        screenPos.y = (1.0f - (normalizedCS.y + 1.0f) * 0.5f) * screen.h;
         return screenPos;
     }
 
@@ -133,10 +131,15 @@ private:
         glm::vec4 center = projection * view * glm::vec4(Position(), 1.0f);
         glm::vec4 offset = projection * view * glm::vec4(Position() + glm::vec3(CHB, 0.0f, 0.0f), 1.0f);
 
-        glm::vec2 screenCenter = glm::vec2((center.x / center.w + 1.0f) * 0.5f * 1280,
-            (1.0f - (center.y / center.w + 1.0f) * 0.5f) * 720);
-        glm::vec2 screenOffset = glm::vec2((offset.x / offset.w + 1.0f) * 0.5f * 1280,
-            (1.0f - (offset.y / offset.w + 1.0f) * 0.5f) * 720);
+        glm::vec2 screenCenter = glm::vec2(
+            (center.x / center.w + 1.0f) * 0.5f * screen.w,
+            (1.0f - (center.y / center.w + 1.0f) * 0.5f) * screen.h
+        );
+
+        glm::vec2 screenOffset = glm::vec2(
+            (offset.x / offset.w + 1.0f) * 0.5f * screen.w,
+            (1.0f - (offset.y / offset.w + 1.0f) * 0.5f) * screen.h
+        );
 
         return glm::length(screenOffset - screenCenter);
     }

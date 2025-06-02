@@ -33,6 +33,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 glm::vec2 mousePos = glm::vec2(0.0f);
+glm::vec2 mouseScreenPos = glm::vec2(0.0f);
 
 Keys keys;
 
@@ -252,17 +253,18 @@ int main()
 
             if (!ingredients.empty()) {
                 ourShader.setMat4("model", active->GetModelMatrix());
-                ourShader.setBool("hasTexture", true);  // ingredienti con texture
-                ourShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
+                ourShader.setBool("hasTexture", true);
+                ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
                 active->Move();
                 active->Draw(ourShader);
 
+                // USA mouseScreenPos per click su ingredienti
                 if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) &&
-                    active->hit(mousePos, perspectiveProj, view)) {
+                    active->hit(mouseScreenPos, perspectiveProj, view)) {
                     ingredients.pop_front();
                     if (!ingredients.empty()) {
                         active = &ingredients[0];
-                        active->AddVelocity(active->getDirectionToCenter() * 5.0f);
+                        active->AddVelocity(active->getDirectionToCenter() * 2.0f);
                         active->updateTime();
                     }
                 }
@@ -366,11 +368,11 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
 
-    // Converti coordinate mouse in coordinate ortografiche usate dal bottone
     float orthoX = xpos - screen.paddingW;
-    float orthoY = screen.h - (ypos - screen.paddingH);  // inverti asse Y
-
+    float orthoY = screen.h - (ypos - screen.paddingH);
     mousePos = glm::vec2(orthoX, orthoY);
+
+    mouseScreenPos = glm::vec2(xpos, ypos);
     //std::cout << ptr->hit(glm::vec2(xpos, ypos), *p, *v) << std::endl;
 
     //printf("%f | %f\n", xval, yval);
