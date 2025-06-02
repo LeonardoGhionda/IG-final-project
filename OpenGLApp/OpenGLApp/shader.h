@@ -22,6 +22,11 @@ public:
         std::string fragmentCode;
         std::ifstream vShaderFile;
         std::ifstream fShaderFile;
+        std::ifstream vertexFile(vertexPath);
+        if (!vertexFile.is_open()) {
+            std::cerr << "Errore apertura shader VERTEX: " << vertexPath << "\n";
+        }
+
         // ensure ifstream objects can throw exceptions:
         vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
         fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);

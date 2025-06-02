@@ -24,6 +24,12 @@
     <ClCompile Include="stb_image.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
+    <ClCompile Include="ScoreManager.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
+    <ClCompile Include="TextRenderer.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="shader.h">
@@ -53,6 +59,12 @@
     <ClInclude Include="keys.h">
       <Filter>File di intestazione</Filter>
     </ClInclude>
+    <ClInclude Include="ScoreManager.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="TextRenderer.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader.fs">
@@ -61,5 +73,8 @@
     <None Include="shader.vs">
       <Filter>File di origine</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="score.txt" />
   </ItemGroup>
 </Project>

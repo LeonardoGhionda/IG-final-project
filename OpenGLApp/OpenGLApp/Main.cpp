@@ -1,10 +1,12 @@
-#include <glad/glad.h>
+﻿#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
+#include <iostream>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 #include "shader.h"
 #include "camera.h"
 #include "model.h"
@@ -12,25 +14,34 @@
 #include "vecplus.h"
 #include "screen.h"
 #include "keys.h"
-
-#include <iostream>
 #include <random>
 #include <deque>
+#include <limits>
+#include "ScoreManager.h"
+#include "TextRenderer.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 
+
 // camera
 //Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = screen.w / 2.0f;
 float lastY = screen.h / 2.0f;
 bool firstMouse = true;
-
+Screen screen = Screen::S16_9();
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+
+TextRenderer textRenderer;
+
+//score
+bool endGame = false;
+int score = 0;
 
 glm::vec2 mousePos = glm::vec2(0.0f);
 
@@ -48,6 +59,7 @@ enum class GameState {
 
 GameState gameState = GameState::MENU;
 std::deque<Ingredient> ingredients;
+std::string playerName = "Player1"; // Default player name, can be changed later
 Ingredient* active = nullptr;
 
 struct Button {
@@ -79,8 +91,7 @@ bool customWindowShouldClose(GLFWwindow* window) {
 
 int main()
 {
-    
-
+  
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -101,7 +112,15 @@ int main()
         glfwTerminate();
         return -1;
     }
+
+    std::ifstream shaderCheck("text.vs");
+    if (!shaderCheck.is_open()) {
+        std::cerr << "❌ text.vs non trovato nella working directory\n";
+    }
+
+
     glfwMakeContextCurrent(window);
+
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
@@ -116,6 +135,17 @@ int main()
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
+    Shader textShader("text.vs", "text.fs"); // Shader per testo
+
+    if (!textRenderer.Load("resources/arial.ttf", 48)) {
+        std::cerr << "Errore caricamento font!\n";
+        return -1;
+    }
+
+    textShader.use();
+    glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(screen.w), 0.0f, static_cast<float>(screen.h));
+    textShader.setMat4("projection", projection);
+
 
     // tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
     //stbi_set_flip_vertically_on_load(true);
@@ -123,6 +153,8 @@ int main()
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // build and compile shaders
     // -------------------------
@@ -172,7 +204,11 @@ int main()
         "INFO"
     };
 
+    // Per bitmap: g->bitmap.buffer
+    // Per contorni: g->outline
 
+    // 4. Da outline → mesh
+    // g->outline: contiene i contorni vettoriali della lettera
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -267,16 +303,73 @@ int main()
                     }
                 }
             }
+          
+            // Controlla fine partita
+            if (!endGame && ingredients.empty()) {
+                endGame = true;
+                std::cout << "\n--- FINE PARTITA ---\n";
+                std::cout << "Inserisci il tuo nome: ";
+
+                std::string inputLine;
+                std::getline(std::cin >> std::ws, inputLine);  // <-- QUESTO è il trucco
+
+                playerName = inputLine;
+
+                if (playerName.empty()) playerName = "Anonimo";
+
+                std::cerr << "[DEBUG] Nome inserito: " << playerName << "\n";
+
+                ScoreManager::SaveScore(playerName, score);
+                std::cout << "Punteggio salvato!\n";
+                gameState = GameState::SCORES;
+
+            }
+
+
+        }
+        else if (gameState == GameState::SCORES) {
+            glDisable(GL_DEPTH_TEST);
+
+            textShader.use();
+            glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+            textShader.setMat4("projection", projection);
+
+            float y = screen.h - 100.0f;
+            float x = 100.0f;
+
+            if (textRenderer.Characters.empty()) {
+                std::cerr << "Font non inizializzato!\n";
+                return -1;
+            }
+
+
+            // Titolo
+            textRenderer.DrawText(textShader, "PUNTEGGI", x, y, 1.5f, glm::vec3(1.0f, 0.8f, 0.0f));
+            y -= 80.0f;
+
+            auto scores = ScoreManager::LoadScores("score.txt");
+            int index = 1;
+            for (const auto& entry : scores) {
+                std::string line = std::to_string(index++) + ". " + entry.name + ": " + std::to_string(entry.score);
+                
+                textRenderer.DrawText(textShader, line, x, y, 1.0f, glm::vec3(1.0f));
+                y -= 80.0f;
+            }
+            if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+                gameState = GameState::MENU;
+            }
         }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
         keys.Update(window);
-    }
 
-
+        }
+        
+    
     // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+
     glfwTerminate();
     return 0;
 }

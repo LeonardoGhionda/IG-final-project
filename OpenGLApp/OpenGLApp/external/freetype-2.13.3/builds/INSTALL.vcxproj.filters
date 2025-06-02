@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\linaa\source\repos\LeonardoGhionda\IG-final-project\OpenGLApp\OpenGLApp\external\freetype-2.13.3\builds\CMakeFiles\57a7efd7d66bce47956cb13f47ae1745\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{7C832090-E53E-3B80-87FE-79A9AEBAA150}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,4 +1,5 @@
 #pragma once
+#include <glm/fwd.hpp>
 
 #define FOV glm::radians(45.0f)
 #define CAMERA_POS glm::vec3(0.0f, 0.0f, 16.0f)
@@ -36,4 +37,4 @@ private:
 	
 };
 
-Screen screen = Screen::S16_9();
+extern Screen screen;
