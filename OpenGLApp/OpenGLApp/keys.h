@@ -32,6 +32,9 @@ class Keys {
 public:
 	Keys() {
 		//Add all supported keys here
+		keys.push_back(Key(GLFW_KEY_A));
+		keys.push_back(Key(GLFW_KEY_D));
+		keys.push_back(Key(GLFW_MOUSE_BUTTON_LEFT));
 		keys.push_back(Key(GLFW_MOUSE_BUTTON_LEFT)); 
 		keys.push_back(Key(GLFW_KEY_Q));
 	}

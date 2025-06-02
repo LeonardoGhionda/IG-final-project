@@ -12,6 +12,7 @@
 #include "vecplus.h"
 #include "screen.h"
 #include "keys.h"
+#include "overlay_column.h"
 
 #include <iostream>
 #include <random>
@@ -38,6 +39,8 @@ Keys keys;
 
 std::random_device rd;
 std::mt19937 gen(rd());
+
+
 
 int main()
 {
@@ -89,10 +92,14 @@ int main()
     // build and compile shaders
     // -------------------------
     Shader ourShader("shader.vs", "shader.fs");
+    Shader overlayShader("overlay_shader.vs", "overlay_shader.fs");
 
     // load models
     // -----------
     Model backgroundPlane("resources/background/background.obj");
+
+    OverlayManager overlay(screen.w, screen.h);
+    
 
 
     deque<Ingredient> ingredients;
@@ -125,7 +132,7 @@ int main()
         // input
         // -----
         processInput(window);
-
+        
         // render
         // ------
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
@@ -149,7 +156,7 @@ int main()
         glEnable(GL_DEPTH_TEST);
 
         // render the ball with perspective projecion
-        glm::mat4 perspectiveProjection = glm::perspective(/*glm::radians(camera.Zoom)*/ FOV, (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+        glm::mat4 perspectiveProjection = glm::perspective(FOV, (float)screen.w / (float)screen.h, 0.1f, 100.0f);
         //glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 view = glm::lookAt(CAMERA_POS, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         ourShader.setMat4("projection", perspectiveProjection);
@@ -159,7 +166,14 @@ int main()
         ourShader.setMat4("model", active->GetModelMatrix());
         active->Move();
         active->Draw(ourShader);
+        
 
+        overlayShader.use();
+
+        if (keys.PressedAndReleased(GLFW_KEY_D)) overlay.SetActiveRight();
+        if (keys.PressedAndReleased(GLFW_KEY_A)) overlay.SetActiveLeft();
+        overlay.Draw(overlayShader);
+        
         if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
             if (active->hit(mousePos, perspectiveProjection, view)) {
                 ingredients.pop_front();
@@ -170,6 +184,7 @@ int main()
                 active->updateTime();
             }
         }
+        
                 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------

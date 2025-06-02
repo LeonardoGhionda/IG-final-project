@@ -153,12 +153,15 @@
     <ClInclude Include="keys.h" />
     <ClInclude Include="mesh.h" />
     <ClInclude Include="model.h" />
+    <ClInclude Include="overlay_column.h" />
     <ClInclude Include="vecplus.h" />
     <ClInclude Include="screen.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="overlay_shader.fs" />
+    <None Include="overlay_shader.vs" />
     <None Include="shader.fs">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </ExcludedFromBuild>
