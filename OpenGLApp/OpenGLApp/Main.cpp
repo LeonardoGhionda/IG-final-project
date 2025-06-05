@@ -13,6 +13,7 @@
 #include "screen.h"
 #include "keys.h"
 #include "overlay_column.h"
+#include "button.h"
 
 #include <iostream>
 #include <random>
@@ -52,38 +53,11 @@ GameState gameState = GameState::MENU;
 std::deque<Ingredient> ingredients;
 Ingredient* active = nullptr;
 
-struct Button {
-    glm::vec2 pos;
-    glm::vec2 size;
-    float yScale;
-    std::string label;
-
-    bool isClicked(glm::vec2 mouse) const {
-        float halfHeight = size.y * yScale / 2.0f;
-        return mouse.x >= pos.x - size.x / 2 && mouse.x <= pos.x + size.x / 2 &&
-            mouse.y >= pos.y - halfHeight && mouse.y <= pos.y + halfHeight;
-    }
-
-    void Draw(Shader& shader, Model& model) {
-        glm::mat4 mat = glm::mat4(1.0f);
-        mat = glm::translate(mat, glm::vec3(pos, 0.0f));
-        mat = glm::scale(mat, glm::vec3(size.x, size.y * yScale, 1.0f));
-        shader.setMat4("model", mat);
-        model.Draw(shader);
-    }
-};
-
-
-bool customWindowShouldClose(GLFWwindow* window) {
-    return glfwWindowShouldClose(window) || (gameState == GameState::PLAYING && ingredients.empty());
-}
 
 
 
+int main() {
 
-int main()
-{
-    
 
     // glfw: initialize and configure
     // ------------------------------
@@ -136,9 +110,7 @@ int main()
     // load models
     // -----------
     Model backgroundPlane("resources/background/background.obj");
-    Model playButtonModel("resources/buttons/playButton.obj");
-    Model scoresButtonModel("resources/buttons/scoresButton.obj");
-    Model infoButtonModel("resources/buttons/infoButton.obj");
+
 
     glm::vec2 baseSize = glm::vec2(100.0f, 50.0f);
     float spacing = 100.0f;
@@ -157,12 +129,16 @@ int main()
     float topY = screen.h / 2.0f + totalHeight / 2.0f - baseSize.y * playYScale / 2.0f;
 
     Button playButton{
+        /*
         glm::vec2(screen.w / 2.0f, topY),
         baseSize,
         playYScale,
-        "PLAY"
+        */
+        "resources/buttons/playButton.obj",
+        "PLAY", 
+        glm::vec3(1.0f),
     };
-
+    /*
     Button scoresButton{
         glm::vec2(screen.w / 2.0f, topY - (baseSize.y * playYScale + spacing)),
         baseSize,
@@ -176,10 +152,10 @@ int main()
         infoYScale,
         "INFO"
     };
+    */
 
+    OverlayManager overlay(static_cast<float>(screen.w), static_cast<float>(screen.h));
 
-    OverlayManager overlay(screen.w, screen.h);
-    
 
 
     deque<Ingredient> ingredients;
@@ -190,7 +166,7 @@ int main()
 
     Ingredient* active = &ingredients[0]; //pointer to the current active ingredient
     active->AddVelocity(active->getDirectionToCenter() * 5.0f);
-    
+
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -201,39 +177,44 @@ int main()
 
     // render loop
     // -----------
-    while (!customWindowShouldClose(window)) {
+    while (!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
         processInput(window);
-        
+
         // render
         // ------
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
         ourShader.use();
 
+        glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+        ourShader.setMat4("projection", orthoProj);
+        ourShader.setMat4("view", glm::mat4(1.0f));
+
+        // Background
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+        ourShader.setMat4("model", model);
+        ourShader.setBool("hasTexture", true);  // background ha texture
+        glDisable(GL_DEPTH);
+        backgroundPlane.Draw(ourShader);
+        glEnable(GL_DEPTH);
+
         if (gameState == GameState::MENU) {
-            glDisable(GL_DEPTH_TEST);
-
-            glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-            ourShader.setMat4("projection", orthoProj);
-            ourShader.setMat4("view", glm::mat4(1.0f));
-
-            // Background
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
-            ourShader.setMat4("model", model);
-            ourShader.setBool("hasTexture", true);  // background ha texture
-            ourShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
-            backgroundPlane.Draw(ourShader);
+           
+            
 
             // Play button (senza texture, colore da MTL o fisso)
             ourShader.setBool("hasTexture", false);
-            playButton.Draw(ourShader, playButtonModel);
-
+            ourShader.setVec3("diffuseColor", glm::vec3(1.0f)); 
+            ourShader.setMat4("model", playButton.GetModelMatrix());
+            playButton.Draw(ourShader);
+            /*
             // Scores button
             ourShader.setBool("hasTexture", false);
             scoresButton.Draw(ourShader, scoresButtonModel);
@@ -241,83 +222,71 @@ int main()
             // Info button
             ourShader.setBool("hasTexture", false);
             infoButton.Draw(ourShader, infoButtonModel);
+            */
 
-
-            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && playButton.isClicked(mousePos)) {
+            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && playButton.mouseInside(mousePos)) {
+                //insert ingredients
                 ingredients.clear();
                 for (int i = 0; i < 4; ++i)
                     ingredients.push_back(Ingredient("resources/ball/ball.obj", Ingredient::RandomSpawnPoint()));
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
-        model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
-
-        ourShader.setMat4("model", model);
-        backgroundPlane.Draw(ourShader);
-        glEnable(GL_DEPTH_TEST);
-
-        // render the ball with perspective projecion
-        glm::mat4 perspectiveProjection = glm::perspective(FOV, (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-        //glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 view = glm::lookAt(CAMERA_POS, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        ourShader.setMat4("projection", perspectiveProjection);
-        ourShader.setMat4("view", view);
-
-        //drawing the firts ingredient in the list 
-        ourShader.setMat4("model", active->GetModelMatrix());
-        active->Move();
-        active->Draw(ourShader);
-        
-
-        overlayShader.use();
-
-        if (keys.PressedAndReleased(GLFW_KEY_D)) overlay.SetActiveRight();
-        if (keys.PressedAndReleased(GLFW_KEY_A)) overlay.SetActiveLeft();
-        overlay.Draw(overlayShader);
-        
-        if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
-            if (active->hit(mousePos, perspectiveProjection, view)) {
-                ingredients.pop_front();
-                if (ingredients.empty())
-                    break;
-                active = &ingredients[0];
-                active->AddVelocity(active->getDirectionToCenter() * 5.0f);
-                active->updateTime();
                 gameState = GameState::PLAYING;
             }
-            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && scoresButton.isClicked(mousePos)) {
-                std::cout << "Scores clicked\n";
-                gameState = GameState::SCORES;
-            }
-
-            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && infoButton.isClicked(mousePos)) {
-                std::cout << "Info clicked\n";
-                gameState = GameState::INFO;
-            }
-
-
         }
         else if (gameState == GameState::PLAYING) {
-            glm::mat4 perspectiveProj = glm::perspective(FOV, (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-            glm::mat4 view = glm::lookAt(CAMERA_POS, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-            ourShader.setMat4("projection", perspectiveProj);
-            ourShader.setMat4("view", view);
+            if (ingredients.size() > 0) {
+                active = &ingredients[0];
 
-            if (!ingredients.empty()) {
-                ourShader.setMat4("model", active->GetModelMatrix());
-                ourShader.setBool("hasTexture", true);
-                ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-                active->Move();
-                active->Draw(ourShader);
+                
 
-                // USA mouseScreenPos per click su ingredienti
-                if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) &&
-                    active->hit(mouseScreenPos, perspectiveProj, view)) {
-                    ingredients.pop_front();
-                    if (!ingredients.empty()) {
-                        active = &ingredients[0];
-                        active->AddVelocity(active->getDirectionToCenter() * 2.0f);
-                        active->updateTime();
+                overlayShader.use();
+
+                if (keys.PressedAndReleased(GLFW_KEY_D)) overlay.SetActiveRight();
+                if (keys.PressedAndReleased(GLFW_KEY_A)) overlay.SetActiveLeft();
+                overlay.Draw(overlayShader);
+
+                ourShader.use();
+                // render the ball with perspective projecion
+                glm::mat4 perspectiveProjection = glm::perspective(FOV, (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+                //glm::mat4 view = camera.GetViewMatrix();
+                glm::mat4 view = glm::lookAt(CAMERA_POS, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                ourShader.setMat4("projection", perspectiveProjection);
+                ourShader.setMat4("view", view);
+
+                if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
+                    if (active->hit(mousePos, perspectiveProjection, view)) {
+                        ingredients.pop_front();
+                        if (!ingredients.empty()) {
+                            active = &ingredients[0];
+                            active->AddVelocity(active->getDirectionToCenter() * 5.0f);
+                            active->updateTime();
+                            gameState = GameState::PLAYING;
+                        }
+                    }
+
+                }
+
+              
+
+                ourShader.setMat4("projection", perspectiveProjection);
+                ourShader.setMat4("view", view);
+
+                if (!ingredients.empty()) {
+                    ourShader.setMat4("model", active->GetModelMatrix());
+                    ourShader.setBool("hasTexture", false);
+                    ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+                    active->Move();
+                    active->Draw(ourShader);
+
+                    // USA mouseScreenPos per click su ingredienti
+                    if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) &&
+                        active->hit(mouseScreenPos, perspectiveProjection, view)) {
+                        ingredients.pop_front();
+                        if (!ingredients.empty()) {
+                            active = &ingredients[0];
+                            active->AddVelocity(active->getDirectionToCenter() * 2.0f);
+                            active->updateTime();
+                        }
                     }
                 }
             }
@@ -325,14 +294,13 @@ int main()
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-        keys.Update(window);
+        keys.Update(window);              
     }
-
-
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
+            
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
@@ -425,6 +393,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     mousePos = glm::vec2(orthoX, orthoY);
 
     mouseScreenPos = glm::vec2(xpos, ypos);
+    //printf("%.1f | %.1f\n", mousePos.x, mousePos.y);
     //std::cout << ptr->hit(glm::vec2(xpos, ypos), *p, *v) << std::endl;
 
     //printf("%f | %f\n", xval, yval);

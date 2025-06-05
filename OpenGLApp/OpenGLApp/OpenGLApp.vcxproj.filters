@@ -53,6 +53,12 @@
     <ClInclude Include="keys.h">
       <Filter>File di intestazione</Filter>
     </ClInclude>
+    <ClInclude Include="overlay_column.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="button.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader.fs">
@@ -61,5 +67,7 @@
     <None Include="shader.vs">
       <Filter>File di origine</Filter>
     </None>
+    <None Include="overlay_shader.fs" />
+    <None Include="overlay_shader.vs" />
   </ItemGroup>
 </Project>

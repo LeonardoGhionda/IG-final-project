@@ -141,7 +141,9 @@ private:
             (1.0f - (offset.y / offset.w + 1.0f) * 0.5f) * screen.h
         );
 
-        return glm::length(screenOffset - screenCenter);
+        pCHB = glm::length(screenOffset - screenCenter);
+
+        return pCHB;
     }
 
     
