@@ -43,6 +43,8 @@ TextRenderer textRenderer;
 bool endGame = false;
 int score = 0;
 
+bool fullscreen = false;
+
 glm::vec2 mousePos = glm::vec2(0.0f);
 glm::vec2 mouseScreenPos = glm::vec2(0.0f);
 
@@ -55,7 +57,8 @@ enum class GameState {
     MENU,
     PLAYING,
     SCORES,
-    INFO
+    INFO,
+    PAUSED
 };
 
 //mouse trail
@@ -271,6 +274,7 @@ int main()
                 active = &ingredients[0];
                 active->AddVelocity(active->getDirectionToCenter() * 5.0f);
                 active->updateTime();
+                score = 0;
                 gameState = GameState::PLAYING;
             }
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && scoresButton.isClicked(mousePos)) {
@@ -286,33 +290,81 @@ int main()
 
         }
         else if (gameState == GameState::PLAYING) {
+           
             glm::mat4 perspectiveProj = glm::perspective(FOV, (float)screen.w / (float)screen.h, 0.1f, 100.0f);
             glm::mat4 view = glm::lookAt(CAMERA_POS, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
             ourShader.setMat4("projection", perspectiveProj);
             ourShader.setMat4("view", view);
+          
 
             if (!ingredients.empty()) {
                 ourShader.setMat4("model", active->GetModelMatrix());
                 ourShader.setBool("hasTexture", true);
                 ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+
                 active->Move();
                 active->Draw(ourShader);
 
+                glDisable(GL_DEPTH_TEST); // evita problemi di Z-buffer
+
+                textShader.use();
+                glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+                textShader.setMat4("projection", projection);
+
+                std::string scoreText = "Score: " + std::to_string(score);
+                glm::vec3 color = glm::vec3(1.0f); // bianco
+
+                textRenderer.DrawText(textShader, scoreText, screen.w - 200.0f, screen.h - 50.0f, 1.0f, color);
+
                 // USA mouseScreenPos per click su ingredienti
-                if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) &&
+               /* if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) &&
                     active->hit(mouseScreenPos, perspectiveProj, view)) {
                     ingredients.pop_front();
                     if (!ingredients.empty()) {
                         active = &ingredients[0];
                         active->AddVelocity(active->getDirectionToCenter() * 2.0f);
                         active->updateTime();
+                       // score++;
+                    }
+                }*/
+
+                //mouse input
+
+                if (active && (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) && 
+                    active->hit(mouseScreenPos, perspectiveProj, view)){
+                  
+                    if (!isDragging) {
+                        mouseTrail.clear();  // inizia nuovo taglio
+                        isDragging = true;
+                        score++;
+
+                        ingredients.pop_front();
+                        if (!ingredients.empty()) {
+                            active = &ingredients[0];
+                            active->AddVelocity(active->getDirectionToCenter() * 2.0f);
+                            active->updateTime();
+                            
+                        }
+                       
+                    }
+                    mouseTrail.push_back(mousePos);
+                }
+                else {
+                    if (isDragging) {
+                        isDragging = false;
+                        // qui potrai processare la combo sugli ingredienti colpiti
                     }
                 }
+                if (mouseTrail.size() > 30) {
+                    mouseTrail.erase(mouseTrail.begin(), mouseTrail.begin() + 5);
+                }
+
             }
           
             // Controlla fine partita
-            if (!endGame && ingredients.empty()) {
+            // Fix the condition by adding parentheses to group the first part of the logical OR
+            if ((!endGame && ingredients.empty()) || (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)) {
                 endGame = true;
                 std::cout << "\n--- FINE PARTITA ---\n";
                 std::cout << "Inserisci il tuo nome: ";
@@ -329,9 +381,8 @@ int main()
                 ScoreManager::SaveScore(playerName, score);
                 std::cout << "Punteggio salvato!\n";
                 gameState = GameState::SCORES;
-
             }
-
+      
 
         }
         else if (gameState == GameState::SCORES) {
@@ -362,9 +413,7 @@ int main()
                 textRenderer.DrawText(textShader, line, x, y, 1.0f, glm::vec3(1.0f));
                 y -= 80.0f;
             }
-            if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-                gameState = GameState::MENU;
-            }
+            
         }
 
         glfwSwapBuffers(window);
@@ -407,39 +456,73 @@ void processInput(GLFWwindow* window)
 
 
     //fullscreen
-    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen==false)
     { 
+		fullscreen = !fullscreen;
+        keys.keyLock[GLFW_KEY_F] = true;
         GLFWmonitor* monitor = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
         glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
 
         screen.w = mode->width;
         screen.h = mode->height;
+        
+
     }
-    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
+    else if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == true){
         screen.resetSize();
         glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
+		fullscreen = !fullscreen;
     }
 
-	//mouse input
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
+        keys.keyLock[GLFW_KEY_F] = false;
+    }
+    
 
-    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-        if (!isDragging) {
-            mouseTrail.clear();  // inizia nuovo taglio
-            isDragging = true;
+	//Pause key
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_P]) {
+        keys.keyLock[GLFW_KEY_P] = true;
+
+        if (gameState == GameState::PLAYING) {
+            gameState = GameState::PAUSED;
         }
-        mouseTrail.push_back(mousePos);
-    }
-    else {
-        if (isDragging) {
-            isDragging = false;
-            // qui potrai processare la combo sugli ingredienti colpiti
+        else if (gameState == GameState::PAUSED) {
+            gameState = GameState::PLAYING;
         }
     }
-    if (mouseTrail.size() > 30) {
-        mouseTrail.erase(mouseTrail.begin(), mouseTrail.begin() + 5);
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE) {
+        keys.keyLock[GLFW_KEY_P] = false;
     }
 
+
+	//Space key 
+    if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+
+        //se sei in Playng
+        if (gameState == GameState::PLAYING && active) {
+            // Aggiungi velocità all'ingrediente attivo
+            active->AddVelocity(active->getDirectionToCenter() * 2.0f);
+            active->updateTime();
+        }
+	}
+
+	// Escape key to return to menu or exit
+    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        if (gameState == GameState::PLAYING) {
+            gameState = GameState::MENU;
+        }
+        else if (gameState == GameState::SCORES || gameState == GameState::INFO) {
+            gameState = GameState::MENU;
+        }
+        if(gameState == GameState::MENU) {
+            ingredients.clear();
+            active = nullptr;
+            endGame = false;
+		}
+	}
+
+	
 
 }
 
