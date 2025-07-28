@@ -58,6 +58,11 @@ enum class GameState {
     INFO
 };
 
+//mouse trail
+std::vector<glm::vec2> mouseTrail;
+bool isDragging = false;
+
+
 GameState gameState = GameState::MENU;
 std::deque<Ingredient> ingredients;
 std::string playerName = "Player1"; // Default player name, can be changed later
@@ -403,7 +408,7 @@ void processInput(GLFWwindow* window)
 
     //fullscreen
     if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
-    {
+    { 
         GLFWmonitor* monitor = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
         glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
@@ -415,6 +420,27 @@ void processInput(GLFWwindow* window)
         screen.resetSize();
         glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
     }
+
+	//mouse input
+
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        if (!isDragging) {
+            mouseTrail.clear();  // inizia nuovo taglio
+            isDragging = true;
+        }
+        mouseTrail.push_back(mousePos);
+    }
+    else {
+        if (isDragging) {
+            isDragging = false;
+            // qui potrai processare la combo sugli ingredienti colpiti
+        }
+    }
+    if (mouseTrail.size() > 30) {
+        mouseTrail.erase(mouseTrail.begin(), mouseTrail.begin() + 5);
+    }
+
+
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
