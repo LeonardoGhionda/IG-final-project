@@ -19,6 +19,7 @@
 #include <limits>
 #include "ScoreManager.h"
 #include "TextRenderer.h"
+#include "focusbox.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -26,12 +27,16 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 
 
-// camera
-//Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = screen.w / 2.0f;
 float lastY = screen.h / 2.0f;
 bool firstMouse = true;
 Screen screen = Screen::S16_9();
+
+// camera
+Camera camera(CAMERA_POS);
+
+float focusSpeed = 400.0f; // puoi metterlo come variabile globale
+
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -144,6 +149,11 @@ int main()
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
+    FocusBox focusBox(glm::vec2(200.0f, 120.0f)); // larghezza 200, altezza 120
+
+
+    focusBox.SetCenter(glm::vec2(screen.w / 2.0f, screen.h / 2.0f));
+
     Shader textShader("text.vs", "text.fs"); // Shader per testo
 
     if (!textRenderer.Load("resources/arial.ttf", 48)) {
@@ -168,6 +178,10 @@ int main()
     // build and compile shaders
     // -------------------------
     Shader ourShader("shader.vs", "shader.fs");
+
+	//shader per focus box
+
+    Shader focusShader("focusbox.vs", "focusbox.fs");
 
     // load models
     // -----------
@@ -212,6 +226,7 @@ int main()
         infoYScale,
         "INFO"
     };
+
 
     // Per bitmap: g->bitmap.buffer
     // Per contorni: g->outline
@@ -290,13 +305,13 @@ int main()
 
         }
         else if (gameState == GameState::PLAYING) {
-           
-            glm::mat4 perspectiveProj = glm::perspective(FOV, (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-            glm::mat4 view = glm::lookAt(CAMERA_POS, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+            glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+            glm::mat4 view = camera.GetViewMatrix();
 
             ourShader.setMat4("projection", perspectiveProj);
             ourShader.setMat4("view", view);
-          
+            
 
             if (!ingredients.empty()) {
                 ourShader.setMat4("model", active->GetModelMatrix());
@@ -316,6 +331,8 @@ int main()
                 glm::vec3 color = glm::vec3(1.0f); // bianco
 
                 textRenderer.DrawText(textShader, scoreText, screen.w - 200.0f, screen.h - 50.0f, 1.0f, color);
+                
+                focusBox.Draw(focusShader, screen.w, screen.h);
 
                 // USA mouseScreenPos per click su ingredienti
                /* if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) &&
@@ -337,17 +354,33 @@ int main()
                     if (!isDragging) {
                         mouseTrail.clear();  // inizia nuovo taglio
                         isDragging = true;
-                        score++;
+
+                        // Proietta la posizione dell'oggetto sullo schermo
+                        glm::vec4 clipPos = perspectiveProj * view * glm::vec4(active->Position(), 1.0f);
+                        clipPos /= clipPos.w;
+
+                        float screenX = ((clipPos.x + 1.0f) / 2.0f) * screen.w;
+                        float screenY = ((clipPos.y + 1.0f) / 2.0f) * screen.h;
+                        glm::vec2 projected = glm::vec2(screenX, screenY);
+
+                        if (focusBox.Contains(projected)) {
+                            score++; //colpito dentro il focus
+                        }
+                        else {
+                            score = std::max(0, score - 1); //fuori dal focus, penalità
+                        }
 
                         ingredients.pop_front();
                         if (!ingredients.empty()) {
                             active = &ingredients[0];
                             active->AddVelocity(active->getDirectionToCenter() * 2.0f);
                             active->updateTime();
-                            
                         }
-                       
+                        else {
+                            active = nullptr;
+                        }
                     }
+
                     mouseTrail.push_back(mousePos);
                 }
                 else {
@@ -359,6 +392,28 @@ int main()
                 if (mouseTrail.size() > 30) {
                     mouseTrail.erase(mouseTrail.begin(), mouseTrail.begin() + 5);
                 }
+
+				//move focus box
+
+                glm::vec2 moveDelta(0.0f);
+                if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)  moveDelta.x -= focusSpeed * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDelta.x += focusSpeed * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)    moveDelta.y += focusSpeed * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)  moveDelta.y -= focusSpeed * deltaTime;
+
+                focusBox.Move(moveDelta);
+
+                if (focusBox.IsActive()) {
+                    glm::vec2 focusPos = focusBox.GetPosition();
+                    glm::vec2 focusSize = focusBox.GetSize();
+                    // Controlla se l'ingrediente attivo è all'interno della focus box
+                    if (active && active->hit(focusPos, perspectiveProj, view)) {
+                        // Aggiungi velocità in direzione del centro della focus box
+                        glm::vec2 directionToCenter = glm::normalize(focusPos - active->MCSPosition(perspectiveProj, view));
+                        active->AddVelocity(directionToCenter * 5.0f);
+                        active->updateTime();
+                    }
+				}
 
             }
           
@@ -445,16 +500,18 @@ void processInput(GLFWwindow* window)
     //Camera movement
     /*
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
+        camera.Position += glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
+        camera.Position -= glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
+        camera.Position -= glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
+        camera.Position += glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
+   
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     */
-
-
+  
     //fullscreen
     if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen==false)
     { 
@@ -579,7 +636,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
     //printf("%f | %f\n", xval, yval);
 
-/*
+
     //CAMERA MOVEMENT FUNCTION
     if (firstMouse)
     {
@@ -596,7 +653,6 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
     if(glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED)
         camera.ProcessMouseMovement(xoffset, yoffset);
-*/
    
     
 }
