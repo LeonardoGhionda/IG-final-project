@@ -9,11 +9,15 @@
 
 
 class Ingredient {
+
 public:
-    Ingredient(const char* path, glm::vec2 spawnpoint) : model(path), mat(1.0f) {
+    Ingredient(const char* path, glm::vec2 spawnpoint,float scale=1.0f) : model(path), mat(1.0f), scaleFactor(scale) {
+        
+      
         mat = glm::translate(mat, glm::vec3(spawnpoint, 0.0f));
         this->spawnpoint = spawnpoint;
         position = spawnpoint;
+
         mat = glm::scale(mat, glm::vec3(1.0f));	
         time = static_cast<float>(glfwGetTime());
 
@@ -41,8 +45,11 @@ public:
         model.Draw(shader); 
     }
 
-    glm::mat4 GetModelMatrix() { return mat; }
-
+    glm::mat4 GetModelMatrix() const {
+        glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(position, 0.0f));
+        transform = glm::scale(transform, glm::vec3(scaleFactor));
+        return transform;
+    }
     void Move() {
         ApplyGravity();
         float deltaTime = static_cast<float>(glfwGetTime()) - time;
@@ -59,6 +66,11 @@ public:
     void AddVelocity(glm::vec2 delta) {
         velocity += delta;
     }
+
+    void SetVelocity(const glm::vec2& vel) {
+        velocity = vel;
+    }
+
 
     //center position in world space 
     glm::vec3 Position() {
@@ -84,7 +96,7 @@ public:
 
     bool hit(glm::vec2 mousePos, glm::mat4 projection, glm::mat4 view) {
         glm::vec2 pos = MCSPosition(projection, view);
-        bool hit =  glm::distance(mousePos, pos) <= CHB_MCS(projection, view);
+        bool hit =  glm::distance(mousePos, pos) <= CHB_MCS(projection, view)*1.5f;
         return hit;
     }
 
@@ -112,6 +124,7 @@ public:
     }
 
 private:
+    float scaleFactor;
     Model model;
     glm::mat4 mat;
     float time;
