@@ -108,39 +108,26 @@ bool customWindowShouldClose(GLFWwindow* window) {
 void SpawnRandomIngredient() {
     std::vector<std::string> allIngredients = {
         "resources/ball/ball.obj"
-      /*  "resources/ingredients/tomato/tomato.obj",
-        "resources/ingredients/apple/apple.obj",
-        "resources/ingredients/pumpkin/pumpkin.obj"*/
+        // altri ingredienti qui
     };
 
-    // Modello casuale
     int index = rand() % allIngredients.size();
-
-    // Punto di spawn casuale (bordi)
     glm::vec2 spawn = Ingredient::RandomSpawnPoint();
-    Ingredient newIngredient(allIngredients[index].c_str(), spawn);
 
-    // Direzione di base verso il centro
-    glm::vec2 centerDir = glm::normalize(-spawn);
+    Ingredient newIngredient(allIngredients[index].c_str(), spawn, 1.0f);
 
-    // Piccola deviazione casuale (senza perdere il centro come destinazione)
-    glm::vec2 randomOffset(
-        ((rand() % 40) - 20) / 100.0f,   // -0.2 a 0.2
-        ((rand() % 40) - 20) / 100.0f
-    );
+    // Direzione verso l'alto e centro, con piccola deviazione casuale
+    glm::vec2 target(0.0f, screen.screenlimit.y * 0.5f);
+    glm::vec2 dir = glm::normalize(target - spawn);
 
-    // Direzione combinata verso il centro ma leggermente deviata
-    glm::vec2 dir = glm::normalize(centerDir + randomOffset * 0.3f);
+    // Aggiungi una leggera deviazione casuale sull'asse X
+    float angleOffset = ((rand() % 40) - 20) * 0.01745f; // ±20°
+    dir = RotateVec2(dir, angleOffset);
 
-    // Aggiungo spinta verso l’alto solo se l’oggetto parte dal basso
-    if (spawn.y < 0) dir.y += 0.5f;
+    // Velocità in stile Fruit Ninja (8-12)
+    float speed = 8.0f + static_cast<float>(rand() % 40) / 4.0f;
 
-    dir = glm::normalize(dir);
-
-    // Velocità più lenta e bilanciata
-    float speed = 1.5f + static_cast<float>(rand() % 100) / 120.0f;  // 1.5 - 2.3
-
-    newIngredient.AddVelocity(dir * speed);
+    newIngredient.SetVelocity(dir * speed);
     ingredients.push_back(newIngredient);
 }
 
@@ -634,6 +621,7 @@ void processInput(GLFWwindow* window)
             ingredients.clear();
             //active = nullptr;
             endGame = false;
+            glfwSetWindowShouldClose(window, true);
 		}
 	}
 

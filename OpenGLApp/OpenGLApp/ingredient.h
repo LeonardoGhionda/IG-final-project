@@ -5,7 +5,8 @@
 #include "vecplus.h"
 #include "screen.h"
 
-#define G glm::vec2(0.0f, -3.0f)
+//#define G glm::vec2(0.0f, -3.0f)
+#define G glm::vec2(0.0f, -6.0f)
 
 
 class Ingredient {
@@ -99,21 +100,18 @@ public:
         bool hit =  glm::distance(mousePos, pos) <= CHB_MCS(projection, view)*1.5f;
         return hit;
     }
-
     static glm::vec2 RandomSpawnPoint() {
-        std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-        std::uniform_int_distribution<int> coin(0, 1);
-        
         std::random_device rd;
         std::mt19937 gen(rd());
 
-        float r = dist(gen);
-        glm::vec2 dir = (coin(gen) == 0)
-            ? glm::vec2((coin(gen) == 0 ? -1 : 1), r)
-            : glm::vec2(r, (coin(gen) == 0 ? -1 : 1));
+        // Spawn solo dal basso dello schermo (asse y negativo)
+        std::uniform_real_distribution<float> distX(-screen.screenlimit.x * 0.8f, screen.screenlimit.x * 0.8f);
+        float x = distX(gen);
+        float y = -screen.screenlimit.y - 1.0f; // un po' fuori schermo in basso
 
-        return screen.screenlimit * dir;
+        return glm::vec2(x, y);
     }
+
 
     glm::vec2 getDirectionToCenter() {
         return this->directionToCenter;
