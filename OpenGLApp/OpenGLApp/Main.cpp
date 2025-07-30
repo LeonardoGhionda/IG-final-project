@@ -111,14 +111,17 @@ bool customWindowShouldClose(GLFWwindow* window) {
 }
 void SpawnRandomIngredient() {
     std::vector<std::string> allIngredients = {
-        "resources/ball/ball.obj"
+        "resources/ball/ball.obj",
+        "resources/ingredients/pumpkin/pumpkin.obj",
+        "resources/ingredients/tomato/tomato.obj"
         // altri ingredienti qui
     };
-
+   
     int index = rand() % allIngredients.size();
     glm::vec2 spawn = Ingredient::RandomSpawnPoint();
 
     Ingredient newIngredient(allIngredients[index].c_str(), spawn, 1.0f);
+
 
     // Direzione verso l'alto e centro, con piccola deviazione casuale
     glm::vec2 target(0.0f, screen.screenlimit.y * 0.5f);
