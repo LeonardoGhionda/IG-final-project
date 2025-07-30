@@ -51,7 +51,10 @@ TextRenderer textRenderer;
 //score
 bool endGame = false;
 int score = 0;
+std::string inputName = "";
+bool isTypingName = false;
 
+//fullscreen
 bool fullscreen = false;
 
 glm::vec2 mousePos = glm::vec2(0.0f);
@@ -67,7 +70,8 @@ enum class GameState {
     PLAYING,
     SCORES,
     INFO,
-    PAUSED
+    PAUSED,
+    NAME_INPUT,
 };
 
 //mouse trail
@@ -131,6 +135,18 @@ void SpawnRandomIngredient() {
     ingredients.push_back(newIngredient);
 }
 
+void character_callback(GLFWwindow* window, unsigned int codepoint) {
+    if (gameState == GameState::NAME_INPUT) {
+        if (codepoint == GLFW_KEY_BACKSPACE && !inputName.empty()) {
+            inputName.pop_back();
+        }
+        else if (inputName.size() < 12 && codepoint >= 32 && codepoint <= 126) {
+            inputName += static_cast<char>(codepoint);
+        }
+    }
+}
+
+
 int main()
 {
   
@@ -167,6 +183,7 @@ int main()
     glfwSetScrollCallback(window, scroll_callback);
     // tell GLFW to capture our mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwSetCharCallback(window, character_callback);
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -468,8 +485,11 @@ int main()
 
 
         }
+
         else if (gameState == GameState::SCORES) {
-            glDisable(GL_DEPTH_TEST);
+
+            ScoreManager manager;
+            auto scores = manager.LoadScores("score.txt");
 
             textShader.use();
             glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
@@ -478,26 +498,76 @@ int main()
             float y = screen.h - 100.0f;
             float x = 100.0f;
 
-            if (textRenderer.Characters.empty()) {
-                std::cerr << "Font non inizializzato!\n";
-                return -1;
-            }
-
-
-            // Titolo
+            // Titolo classifica
             textRenderer.DrawText(textShader, "PUNTEGGI", x, y, 1.5f, glm::vec3(1.0f, 0.8f, 0.0f));
             y -= 80.0f;
 
-            auto scores = ScoreManager::LoadScores("score.txt");
-            int index = 1;
-            for (const auto& entry : scores) {
-                std::string line = std::to_string(index++) + ". " + entry.name + ": " + std::to_string(entry.score);
-                
-                textRenderer.DrawText(textShader, line, x, y, 1.0f, glm::vec3(1.0f));
-                y -= 80.0f;
+            if (scores.empty()) {
+                // Nessun punteggio registrato
+                textRenderer.DrawText(textShader, "Nessun punteggio salvato.", x, y, 1.0f, glm::vec3(1.0f));
             }
-            
+            else {
+                int index = 1;
+                for (const auto& entry : scores) {
+                    std::string line = std::to_string(index++) + ". " + entry.name + ": " + std::to_string(entry.score);
+                    textRenderer.DrawText(textShader, line, x, y, 1.0f, glm::vec3(1.0f));
+                    y -= 60.0f;  // Spaziatura tra le righe
+                }
+            }
+            if (textRenderer.Characters.empty()) {
+                std::cerr << "Font non inizializzato!\n";
+                continue;  // Salta il frame, non blocca il gioco
+            }
+
         }
+
+        else if (gameState == GameState::NAME_INPUT) {
+            glDisable(GL_DEPTH_TEST);
+            textShader.use();
+
+            // Titolo
+            textRenderer.DrawText(textShader, "INSERISCI NOME:", screen.w / 3, screen.h / 2 + 50, 1.0f, glm::vec3(1.0f));
+
+            // Mostra testo digitato
+            textRenderer.DrawText(textShader, inputName + "_", screen.w / 3, screen.h / 2, 1.0f, glm::vec3(0.5f, 1.0f, 0.5f));
+
+            // -------------------------------
+            // Gestione BACKSPACE
+            // -------------------------------
+            if (glfwGetKey(window, GLFW_KEY_BACKSPACE) == GLFW_PRESS && !inputName.empty()) {
+                static double lastDeleteTime = 0;
+                double currentTime = glfwGetTime();
+
+                // Ritardo per evitare cancellazioni multiple in un singolo frame
+                if (currentTime - lastDeleteTime > 0.15) {
+                    inputName.pop_back();
+                    lastDeleteTime = currentTime;
+                }
+            }
+
+            // -------------------------------
+            // Gestione ENTER (normale + tastierino)
+            // -------------------------------
+            if ((glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS ||
+                glfwGetKey(window, GLFW_KEY_KP_ENTER) == GLFW_PRESS)) {
+
+                // Se nome vuoto, assegna "Anonimo"
+                if (inputName.empty()) {
+                    playerName = "Anonimo";
+                }
+                else {
+                    playerName = inputName;
+                }
+
+                // Salvataggio punteggio
+                ScoreManager manager;
+                manager.SaveScore(playerName, score);
+
+                // Vai alla classifica
+                gameState = GameState::SCORES;
+            }
+}
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -596,7 +666,8 @@ void processInput(GLFWwindow* window)
 
            
                 endGame = true;
-                std::cout << "\n--- FINE PARTITA ---\n";
+              
+              /*  std::cout << "\n--- FINE PARTITA ---\n";
                 std::cout << "Inserisci il tuo nome: ";
 
                 std::string inputLine;
@@ -610,8 +681,8 @@ void processInput(GLFWwindow* window)
                 std::cerr << "[DEBUG] Nome inserito: " << playerName << "\n";
 
                 ScoreManager::SaveScore(playerName, score);
-                std::cout << "Punteggio salvato!\n";
-                gameState = GameState::SCORES;
+                std::cout << "Punteggio salvato!\n";*/
+                gameState = GameState::NAME_INPUT;
             
         }
         else if (gameState == GameState::SCORES || gameState == GameState::INFO) {
