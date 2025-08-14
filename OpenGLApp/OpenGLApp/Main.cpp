@@ -19,6 +19,7 @@
 #include <limits>
 #include "ScoreManager.h"
 #include "TextRenderer.h"
+#include "focusbox.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -26,15 +27,23 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 
 
-// camera
-//Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = screen.w / 2.0f;
 float lastY = screen.h / 2.0f;
 bool firstMouse = true;
 Screen screen = Screen::S16_9();
+
+// camera
+Camera camera(CAMERA_POS);
+
+float focusSpeed = 400.0f; // puoi metterlo come variabile globale
+
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+//spawn
+float spawnInterval = 2.0f;   // intervallo tra un lancio e l'altro (in secondi)
+float spawnTimer = 0.0f;      // tempo trascorso dall'ultimo lancio
 
 
 TextRenderer textRenderer;
@@ -42,6 +51,11 @@ TextRenderer textRenderer;
 //score
 bool endGame = false;
 int score = 0;
+std::string inputName = "";
+bool isTypingName = false;
+
+//fullscreen
+bool fullscreen = false;
 
 glm::vec2 mousePos = glm::vec2(0.0f);
 glm::vec2 mouseScreenPos = glm::vec2(0.0f);
@@ -55,13 +69,20 @@ enum class GameState {
     MENU,
     PLAYING,
     SCORES,
-    INFO
+    INFO,
+    PAUSED,
+    NAME_INPUT,
 };
+
+//mouse trail
+std::vector<glm::vec2> mouseTrail;
+bool isDragging = false;
+
 
 GameState gameState = GameState::MENU;
 std::deque<Ingredient> ingredients;
 std::string playerName = "Player1"; // Default player name, can be changed later
-Ingredient* active = nullptr;
+//Ingredient* active = nullptr;
 
 struct Button {
     glm::vec2 pos;
@@ -86,7 +107,46 @@ struct Button {
 
 
 bool customWindowShouldClose(GLFWwindow* window) {
-    return glfwWindowShouldClose(window) || (gameState == GameState::PLAYING && ingredients.empty());
+    return glfwWindowShouldClose(window) ;
+}
+void SpawnRandomIngredient() {
+    std::vector<std::string> allIngredients = {
+        "resources/ball/ball.obj",
+        "resources/ingredients/pumpkin/pumpkin.obj",
+        "resources/ingredients/tomato/tomato.obj"
+        // altri ingredienti qui
+    };
+   
+    int index = rand() % allIngredients.size();
+    glm::vec2 spawn = Ingredient::RandomSpawnPoint();
+
+    Ingredient newIngredient(allIngredients[index].c_str(), spawn, 1.0f);
+
+
+    // Direzione verso l'alto e centro, con piccola deviazione casuale
+    glm::vec2 target(0.0f, screen.screenlimit.y * 0.5f);
+    glm::vec2 dir = glm::normalize(target - spawn);
+
+    // Aggiungi una leggera deviazione casuale sull'asse X
+    float angleOffset = ((rand() % 40) - 20) * 0.01745f; // ±20°
+    dir = RotateVec2(dir, angleOffset);
+
+    // Velocità in stile Fruit Ninja (8-12)
+    float speed = 8.0f + static_cast<float>(rand() % 40) / 4.0f;
+
+    newIngredient.SetVelocity(dir * speed);
+    ingredients.push_back(newIngredient);
+}
+
+void character_callback(GLFWwindow* window, unsigned int codepoint) {
+    if (gameState == GameState::NAME_INPUT) {
+        if (codepoint == GLFW_KEY_BACKSPACE && !inputName.empty()) {
+            inputName.pop_back();
+        }
+        else if (inputName.size() < 12 && codepoint >= 32 && codepoint <= 126) {
+            inputName += static_cast<char>(codepoint);
+        }
+    }
 }
 
 
@@ -116,18 +176,17 @@ int main()
 
     std::ifstream shaderCheck("text.vs");
     if (!shaderCheck.is_open()) {
-        std::cerr << "❌ text.vs non trovato nella working directory\n";
+        std::cerr << " text.vs non trovato nella working directory\n";
     }
 
 
     glfwMakeContextCurrent(window);
-
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-
     // tell GLFW to capture our mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwSetCharCallback(window, character_callback);
 
     // glad: load all OpenGL function pointers
     // ---------------------------------------
@@ -136,13 +195,14 @@ int main()
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
-    Shader textShader("text.vs", "text.fs"); // Shader per testo
+    FocusBox focusBox(glm::vec2(200.0f, 120.0f)); // larghezza 200, altezza 120
+    focusBox.SetCenter(glm::vec2(screen.w / 2.0f, screen.h / 2.0f));
 
+    Shader textShader("text.vs", "text.fs"); // Shader per testo
     if (!textRenderer.Load("resources/arial.ttf", 48)) {
         std::cerr << "Errore caricamento font!\n";
         return -1;
     }
-
     textShader.use();
     glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(screen.w), 0.0f, static_cast<float>(screen.h));
     textShader.setMat4("projection", projection);
@@ -160,7 +220,8 @@ int main()
     // build and compile shaders
     // -------------------------
     Shader ourShader("shader.vs", "shader.fs");
-
+	//shader per focus box
+    Shader focusShader("focusbox.vs", "focusbox.fs");
     // load models
     // -----------
     Model backgroundPlane("resources/background/background.obj");
@@ -204,6 +265,7 @@ int main()
         infoYScale,
         "INFO"
     };
+
 
     // Per bitmap: g->bitmap.buffer
     // Per contorni: g->outline
@@ -261,12 +323,19 @@ int main()
 
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && playButton.isClicked(mousePos)) {
                 ingredients.clear();
+                score = 0;
+				spawnTimer = 0.0f; // Reset timer
+                gameState = GameState::PLAYING;
+
+				/*
+                //inserisco 4 ingredienti
                 for (int i = 0; i < 4; ++i)
                     ingredients.push_back(Ingredient("resources/ball/ball.obj", Ingredient::RandomSpawnPoint()));
                 active = &ingredients[0];
                 active->AddVelocity(active->getDirectionToCenter() * 5.0f);
-                active->updateTime();
-                gameState = GameState::PLAYING;
+                active->updateTime();   
+               */
+
             }
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && scoresButton.isClicked(mousePos)) {
                 std::cout << "Scores clicked\n";
@@ -278,59 +347,152 @@ int main()
                 gameState = GameState::INFO;
             }
 
-
         }
         else if (gameState == GameState::PLAYING) {
-            glm::mat4 perspectiveProj = glm::perspective(FOV, (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-            glm::mat4 view = glm::lookAt(CAMERA_POS, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
+            
+            spawnTimer += deltaTime;
+            if (spawnTimer >= spawnInterval) {
+                SpawnRandomIngredient();
+                spawnTimer = 0.0f;
+            }
+            glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+            glm::mat4 view = camera.GetViewMatrix();
             ourShader.setMat4("projection", perspectiveProj);
             ourShader.setMat4("view", view);
-
-            if (!ingredients.empty()) {
-                ourShader.setMat4("model", active->GetModelMatrix());
+            for (auto& ing : ingredients) {
+                ing.Move();
+                ourShader.setMat4("model", ing.GetModelMatrix());
                 ourShader.setBool("hasTexture", true);
                 ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-                active->Move();
-                active->Draw(ourShader);
+                ing.Draw(ourShader);
+            }
+
+            if (!ingredients.empty()) {
+               // ourShader.setMat4("model", active->GetModelMatrix());
+                //ourShader.setBool("hasTexture", true);
+               // ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+
+              //  active->Move();
+              //  active->Draw(ourShader);
+
+                // Aggiorna e disegna tutti gli ingredienti
+                for (auto& ing : ingredients) {
+                    ing.Move();
+                    ourShader.setMat4("model", ing.GetModelMatrix());
+                    ourShader.setBool("hasTexture", true);
+                    ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+                    ing.Draw(ourShader);
+                }
+
+                //Mostra punteggio             
+                textShader.use();
+                glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+                textShader.setMat4("projection", projection);
+                std::string scoreText = "Score: " + std::to_string(score);
+                glm::vec3 color = glm::vec3(1.0f); // bianco
+                textRenderer.DrawText(textShader, scoreText, screen.w - 200.0f, screen.h - 50.0f, 1.0f, color);
+                
 
                 // USA mouseScreenPos per click su ingredienti
-                if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) &&
+               /* if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) &&
                     active->hit(mouseScreenPos, perspectiveProj, view)) {
                     ingredients.pop_front();
                     if (!ingredients.empty()) {
                         active = &ingredients[0];
                         active->AddVelocity(active->getDirectionToCenter() * 2.0f);
                         active->updateTime();
+                       // score++;
+                    }
+                }*/
+
+                //mouse input
+
+               /* if (active && (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) && 
+                    active->hit(mouseScreenPos, perspectiveProj, view)){
+                  
+                    if (!isDragging) {
+                        mouseTrail.clear();  // inizia nuovo taglio
+                        isDragging = true;
+
+                        // Proietta la posizione dell'oggetto sullo schermo
+                        glm::vec4 clipPos = perspectiveProj * view * glm::vec4(active->Position(), 1.0f);
+                        clipPos /= clipPos.w;
+
+                        float screenX = ((clipPos.x + 1.0f) / 2.0f) * screen.w;
+                        float screenY = ((clipPos.y + 1.0f) / 2.0f) * screen.h;
+                        glm::vec2 projected = glm::vec2(screenX, screenY);
+
+                        if (focusBox.Contains(projected)) {
+                            score++; //colpito dentro il focus
+                        }
+                        else {
+                            score = std::max(0, score - 1); //fuori dal focus, penalità
+                        }
+                        /*
+                        ingredients.pop_front();
+                        if (!ingredients.empty()) {
+                            active = &ingredients[0];
+                            active->AddVelocity(active->getDirectionToCenter() * 2.0f);
+                            active->updateTime();
+                        }
+                        else {
+                            active = nullptr;
+                        }
+                    }
+
+                    mouseTrail.push_back(mousePos);
+                }
+                else {
+                    if (isDragging) {
+                        isDragging = false;
+                        // qui potrai processare la combo sugli ingredienti colpiti
                     }
                 }
+                if (mouseTrail.size() > 30) {
+                    mouseTrail.erase(mouseTrail.begin(), mouseTrail.begin() + 5);
+                }
+                  */
+				//move focus box
+                // Movimento della focus box
+                glm::vec2 moveDelta(0.0f);
+                if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveDelta.x -= 400.0f * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDelta.x += 400.0f * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDelta.y += 400.0f * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) moveDelta.y -= 400.0f * deltaTime;
+
+                focusBox.Move(moveDelta);
+
+                focusBox.Draw(focusShader, screen.w, screen.h);
+               
+
+
             }
-          
-            // Controlla fine partita
-            if (!endGame && ingredients.empty()) {
-                endGame = true;
-                std::cout << "\n--- FINE PARTITA ---\n";
-                std::cout << "Inserisci il tuo nome: ";
 
-                std::string inputLine;
-                std::getline(std::cin >> std::ws, inputLine);  // <-- QUESTO è il trucco
+            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
+                for (auto it = ingredients.begin(); it != ingredients.end();) {
+                    if (it->hit(mouseScreenPos, perspectiveProj, view)) {
+                        if (focusBox.Contains(mousePos)) {
+                            score++;
+                        }
+                        else {
+                            score = std::max(0, score - 1);
+                        }
+                        it = ingredients.erase(it);
+                    }
 
-                playerName = inputLine;
-
-                if (playerName.empty()) playerName = "Anonimo";
-
-                std::cerr << "[DEBUG] Nome inserito: " << playerName << "\n";
-
-                ScoreManager::SaveScore(playerName, score);
-                std::cout << "Punteggio salvato!\n";
-                gameState = GameState::SCORES;
-
+                    else {
+                        ++it;
+                    }
+                }
             }
 
 
         }
+
         else if (gameState == GameState::SCORES) {
-            glDisable(GL_DEPTH_TEST);
+
+            ScoreManager manager;
+            auto scores = manager.LoadScores("score.txt");
 
             textShader.use();
             glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
@@ -339,28 +501,76 @@ int main()
             float y = screen.h - 100.0f;
             float x = 100.0f;
 
-            if (textRenderer.Characters.empty()) {
-                std::cerr << "Font non inizializzato!\n";
-                return -1;
-            }
-
-
-            // Titolo
+            // Titolo classifica
             textRenderer.DrawText(textShader, "PUNTEGGI", x, y, 1.5f, glm::vec3(1.0f, 0.8f, 0.0f));
             y -= 80.0f;
 
-            auto scores = ScoreManager::LoadScores("score.txt");
-            int index = 1;
-            for (const auto& entry : scores) {
-                std::string line = std::to_string(index++) + ". " + entry.name + ": " + std::to_string(entry.score);
-                
-                textRenderer.DrawText(textShader, line, x, y, 1.0f, glm::vec3(1.0f));
-                y -= 80.0f;
+            if (scores.empty()) {
+                // Nessun punteggio registrato
+                textRenderer.DrawText(textShader, "Nessun punteggio salvato.", x, y, 1.0f, glm::vec3(1.0f));
             }
-            if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-                gameState = GameState::MENU;
+            else {
+                int index = 1;
+                for (const auto& entry : scores) {
+                    std::string line = std::to_string(index++) + ". " + entry.name + ": " + std::to_string(entry.score);
+                    textRenderer.DrawText(textShader, line, x, y, 1.0f, glm::vec3(1.0f));
+                    y -= 60.0f;  // Spaziatura tra le righe
+                }
             }
+            if (textRenderer.Characters.empty()) {
+                std::cerr << "Font non inizializzato!\n";
+                continue;  // Salta il frame, non blocca il gioco
+            }
+
         }
+
+        else if (gameState == GameState::NAME_INPUT) {
+            glDisable(GL_DEPTH_TEST);
+            textShader.use();
+
+            // Titolo
+            textRenderer.DrawText(textShader, "INSERISCI NOME:", screen.w / 3, screen.h / 2 + 50, 1.0f, glm::vec3(1.0f));
+
+            // Mostra testo digitato
+            textRenderer.DrawText(textShader, inputName + "_", screen.w / 3, screen.h / 2, 1.0f, glm::vec3(0.5f, 1.0f, 0.5f));
+
+            // -------------------------------
+            // Gestione BACKSPACE
+            // -------------------------------
+            if (glfwGetKey(window, GLFW_KEY_BACKSPACE) == GLFW_PRESS && !inputName.empty()) {
+                static double lastDeleteTime = 0;
+                double currentTime = glfwGetTime();
+
+                // Ritardo per evitare cancellazioni multiple in un singolo frame
+                if (currentTime - lastDeleteTime > 0.15) {
+                    inputName.pop_back();
+                    lastDeleteTime = currentTime;
+                }
+            }
+
+            // -------------------------------
+            // Gestione ENTER (normale + tastierino)
+            // -------------------------------
+            if ((glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS ||
+                glfwGetKey(window, GLFW_KEY_KP_ENTER) == GLFW_PRESS)) {
+
+                // Se nome vuoto, assegna "Anonimo"
+                if (inputName.empty()) {
+                    playerName = "Anonimo";
+                }
+                else {
+                    playerName = inputName;
+                }
+
+                // Salvataggio punteggio
+                ScoreManager manager;
+                manager.SaveScore(playerName, score);
+
+                // Vai alla classifica
+                gameState = GameState::SCORES;
+            }
+}
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -391,30 +601,106 @@ void processInput(GLFWwindow* window)
     //Camera movement
     /*
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
+        camera.Position += glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
+        camera.Position -= glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
+        camera.Position -= glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
+        camera.Position += glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
+   
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     */
-
-
+  
     //fullscreen
-    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
-    {
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen==false)
+    { 
+		fullscreen = !fullscreen;
+        keys.keyLock[GLFW_KEY_F] = true;
         GLFWmonitor* monitor = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
         glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
 
         screen.w = mode->width;
         screen.h = mode->height;
+        
+
     }
-    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
+    else if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == true){
         screen.resetSize();
         glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
+		fullscreen = !fullscreen;
     }
+
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
+        keys.keyLock[GLFW_KEY_F] = false;
+    }
+    
+
+	//Pause key
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_P]) {
+        keys.keyLock[GLFW_KEY_P] = true;
+
+        if (gameState == GameState::PLAYING) {
+            gameState = GameState::PAUSED;
+        }
+        else if (gameState == GameState::PAUSED) {
+            gameState = GameState::PLAYING;
+        }
+    }
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE) {
+        keys.keyLock[GLFW_KEY_P] = false;
+    }
+
+
+	//Space key 
+    if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+
+        //se sei in Playng
+        if (gameState == GameState::PLAYING && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+          //deve fare qualcosa
+        }
+	}
+
+	// Escape key to return to menu or exit
+    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        if (gameState == GameState::PLAYING) {
+
+           
+                endGame = true;
+              
+              /*  std::cout << "\n--- FINE PARTITA ---\n";
+                std::cout << "Inserisci il tuo nome: ";
+
+                std::string inputLine;
+
+                std::getline(std::cin >> std::ws, inputLine);
+
+                playerName = inputLine;
+
+                if (playerName.empty()) playerName = "Anonimo";
+
+                std::cerr << "[DEBUG] Nome inserito: " << playerName << "\n";
+
+                ScoreManager::SaveScore(playerName, score);
+                std::cout << "Punteggio salvato!\n";*/
+                gameState = GameState::NAME_INPUT;
+            
+        }
+        else if (gameState == GameState::SCORES || gameState == GameState::INFO) {
+            gameState = GameState::MENU;
+        }
+        if(gameState == GameState::MENU) {
+            ingredients.clear();
+            //active = nullptr;
+            endGame = false;
+            glfwSetWindowShouldClose(window, true);
+		}
+	}
+
+	
+
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -470,7 +756,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
     //printf("%f | %f\n", xval, yval);
 
-/*
+
     //CAMERA MOVEMENT FUNCTION
     if (firstMouse)
     {
@@ -487,7 +773,6 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
     if(glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED)
         camera.ProcessMouseMovement(xoffset, yoffset);
-*/
    
     
 }

@@ -4,78 +4,87 @@
 
 
 class Key {
-	friend class Keys;
+    friend class Keys;
 public:
-	Key(int key): key(key) {}
+    Key(int key) : key(key) {}
 private:
-	int key;
-	int status = -1;
-	bool was_pressed = false;
+    int key;
+    int status = -1;
+    bool was_pressed = false;
 
-	bool pressed() const {
-		return status == GLFW_PRESS;
-	}
+    bool pressed() const {
+        return status == GLFW_PRESS;
+    }
 
-	bool released() const {
-		return status == GLFW_RELEASE;
-	}
+    bool released() const {
+        return status == GLFW_RELEASE;
+    }
 
-	bool pressed_released() const {
-		return was_pressed && status == GLFW_RELEASE;
-	}
+    bool pressed_released() const {
+        return was_pressed && status == GLFW_RELEASE;
+    }
 };
 
-
 class Keys {
-	
-
 public:
-	Keys() {
-		//Add all supported keys here
-		keys.push_back(Key(GLFW_MOUSE_BUTTON_LEFT)); 
-		keys.push_back(Key(GLFW_KEY_Q));
-	}
+    Keys() {
+        // Aggiungi qui i tasti che vuoi monitorare
+        keys.push_back(Key(GLFW_MOUSE_BUTTON_LEFT));
+        keys.push_back(Key(GLFW_KEY_Q));
+        keys.push_back(Key(GLFW_KEY_P));
+        // aggiungi altri se vuoi
+    }
 
-	void Update(GLFWwindow* window) {
-		for (Key &k : keys) {
-			(k.status == GLFW_PRESS) ? (k.was_pressed = true) : (k.was_pressed = false);
-			if (k.key == GLFW_MOUSE_BUTTON_LEFT || k.key == GLFW_MOUSE_BUTTON_RIGHT) {
-				k.status = glfwGetMouseButton(window, k.key);
-			}
-			else {
-				k.status = glfwGetKey(window, k.key);
-			}
-		}
-	}
+    void Update(GLFWwindow* window) {
+        for (Key& k : keys) {
+            int currentStatus;
 
-	bool Pressed(int key) const {
-		
-		for (const Key& k : keys) {
-			if (k.key == key)
-				return k.pressed();
-		}
-		return false;
-	}
+            if (k.key >= GLFW_MOUSE_BUTTON_1 && k.key <= GLFW_MOUSE_BUTTON_LAST) {
+                currentStatus = glfwGetMouseButton(window, k.key);
+            }
+            else {
+                currentStatus = glfwGetKey(window, k.key);
+            }
 
-	bool Released(int key) const {
-		for (const Key& k : keys) {
-			if (k.key == key)
-				return k.released();
-		}
-		return false;
-	}
+            // Update keyLock
+            if (currentStatus == GLFW_RELEASE)
+                keyLock[k.key] = false;
 
-	bool PressedAndReleased(int key) const {
-		for (const Key& k : keys) {
-			if (k.key == key)
-				return k.pressed_released();
-		}
-		return false;
-	}
-	
+            // Salva stato precedente
+            k.was_pressed = (k.status == GLFW_PRESS);
 
+            // Aggiorna stato corrente
+            k.status = currentStatus;
+        }
+    }
+
+    bool Pressed(int key) const {
+        for (const Key& k : keys) {
+            if (k.key == key)
+                return k.pressed();
+        }
+        return false;
+    }
+
+    bool Released(int key) const {
+        for (const Key& k : keys) {
+            if (k.key == key)
+                return k.released();
+        }
+        return false;
+    }
+
+    bool PressedAndReleased(int key) const {
+        for (const Key& k : keys) {
+            if (k.key == key)
+                return k.pressed_released();
+        }
+        return false;
+    }
+
+    // Blocchi accessibili esternamente
+    bool keyLock[1024] = { false };
 
 private:
-	std::vector<Key> keys;
-
+    std::vector<Key> keys;
 };

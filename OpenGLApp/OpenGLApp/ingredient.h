@@ -5,15 +5,20 @@
 #include "vecplus.h"
 #include "screen.h"
 
-#define G glm::vec2(0.0f, -3.0f)
+//#define G glm::vec2(0.0f, -3.0f)
+#define G glm::vec2(0.0f, -6.0f)
 
 
 class Ingredient {
+
 public:
-    Ingredient(const char* path, glm::vec2 spawnpoint) : model(path), mat(1.0f) {
+    Ingredient(const char* path, glm::vec2 spawnpoint,float scale=1.0f) : model(path), mat(1.0f), scaleFactor(scale) {
+        
+      
         mat = glm::translate(mat, glm::vec3(spawnpoint, 0.0f));
         this->spawnpoint = spawnpoint;
         position = spawnpoint;
+
         mat = glm::scale(mat, glm::vec3(1.0f));	
         time = static_cast<float>(glfwGetTime());
 
@@ -41,8 +46,11 @@ public:
         model.Draw(shader); 
     }
 
-    glm::mat4 GetModelMatrix() { return mat; }
-
+    glm::mat4 GetModelMatrix() const {
+        glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(position, 0.0f));
+        transform = glm::scale(transform, glm::vec3(scaleFactor));
+        return transform;
+    }
     void Move() {
         ApplyGravity();
         float deltaTime = static_cast<float>(glfwGetTime()) - time;
@@ -59,6 +67,11 @@ public:
     void AddVelocity(glm::vec2 delta) {
         velocity += delta;
     }
+
+    void SetVelocity(const glm::vec2& vel) {
+        velocity = vel;
+    }
+
 
     //center position in world space 
     glm::vec3 Position() {
@@ -84,24 +97,21 @@ public:
 
     bool hit(glm::vec2 mousePos, glm::mat4 projection, glm::mat4 view) {
         glm::vec2 pos = MCSPosition(projection, view);
-        bool hit =  glm::distance(mousePos, pos) <= CHB_MCS(projection, view);
+        bool hit =  glm::distance(mousePos, pos) <= CHB_MCS(projection, view)*1.5f;
         return hit;
     }
-
     static glm::vec2 RandomSpawnPoint() {
-        std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-        std::uniform_int_distribution<int> coin(0, 1);
-        
         std::random_device rd;
         std::mt19937 gen(rd());
 
-        float r = dist(gen);
-        glm::vec2 dir = (coin(gen) == 0)
-            ? glm::vec2((coin(gen) == 0 ? -1 : 1), r)
-            : glm::vec2(r, (coin(gen) == 0 ? -1 : 1));
+        // Spawn solo dal basso dello schermo (asse y negativo)
+        std::uniform_real_distribution<float> distX(-screen.screenlimit.x * 0.8f, screen.screenlimit.x * 0.8f);
+        float x = distX(gen);
+        float y = -screen.screenlimit.y - 1.0f; // un po' fuori schermo in basso
 
-        return screen.screenlimit * dir;
+        return glm::vec2(x, y);
     }
+
 
     glm::vec2 getDirectionToCenter() {
         return this->directionToCenter;
@@ -112,6 +122,7 @@ public:
     }
 
 private:
+    float scaleFactor;
     Model model;
     glm::mat4 mat;
     float time;

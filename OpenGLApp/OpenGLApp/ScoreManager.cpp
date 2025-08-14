@@ -31,9 +31,15 @@ std::vector<ScoreEntry> ScoreManager::LoadScores(const std::string& filename) {
         }
     }
 
+    // Ordinamento decrescente in base al punteggio
     std::sort(scores.begin(), scores.end(), [](const ScoreEntry& a, const ScoreEntry& b) {
-        return b.score > a.score; // ordinamento decrescente
+        return b.score < a.score;
         });
+
+    // Limita la classifica ai primi 10 punteggi
+    if (scores.size() > 10) {
+        scores.resize(10);
+    }
 
     return scores;
 }

@@ -30,6 +30,9 @@
     <ClCompile Include="TextRenderer.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
+    <ClCompile Include="focusbox.cpp">
+      <Filter>File di origine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="shader.h">
@@ -64,6 +67,9 @@
     </ClInclude>
     <ClInclude Include="TextRenderer.h">
       <Filter>File di intestazione</Filter>
+    </ClInclude>
+    <ClInclude Include="focusbox.h">
+      <Filter>File di origine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
