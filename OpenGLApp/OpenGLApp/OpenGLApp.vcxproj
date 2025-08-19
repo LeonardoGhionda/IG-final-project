@@ -118,7 +118,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\..\irrKlang-64bit-1.6.0\include;..\..\glm-master;..\..\glad\include;..\..\glfw-3.3.8.bin.WIN64\include;..\..\Assimp\include;%(AdditionalIncludeDirectories);C:\Users\asche\vcpkg\installed\x64-windows\include;C:\Users\linaa\vcpkg\installed\x64-windows\include;C:\Users\linaa\source\repos\LeonardoGhionda\IG-final-project\OpenGLApp\OpenGLApp\external\freetype-2.13.3\include;C:\Users\linaa\source\repos\LeonardoGhionda\IG-final-project\OpenGLApp\OpenGLApp\external\freetype-2.13.3\builds</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\irrKlang-64bit-1.6.0\include;..\..\glm-master;..\..\glad\include;..\..\glfw-3.3.8.bin.WIN64\include;..\..\Assimp\include;%(AdditionalIncludeDirectories);C:\Users\asche\vcpkg\installed\x64-windows\include;..\..\OpenGLApp\OpenGLApp\external\vcpkg\installed\x64-windows\include;..\..\OpenGLApp\OpenGLApp\external\freetype-2.13.3\include;..\..\OpenGLApp\OpenGLApp\external\freetype-2.13.3\builds</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
