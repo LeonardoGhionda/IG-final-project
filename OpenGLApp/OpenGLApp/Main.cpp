@@ -85,23 +85,45 @@ std::string playerName = "Player1"; // Default player name, can be changed later
 //Ingredient* active = nullptr;
 
 struct Button {
+    //pos changed: defined as screen percentage
     glm::vec2 pos;
+
     glm::vec2 size;
     float yScale;
     std::string label;
 
-    bool isClicked(glm::vec2 mouse) const {
-        float halfHeight = size.y * yScale / 2.0f;
-        return mouse.x >= pos.x - size.x / 2 && mouse.x <= pos.x + size.x / 2 &&
-            mouse.y >= pos.y - halfHeight && mouse.y <= pos.y + halfHeight;
+public:
+
+    bool isClicked(glm::vec2 mouse) {
+        glm::vec2 pixelPos = Pos();
+
+        glm::vec2 screenScale = screen.scaleFactor();
+        float halfWidth = (size.x * screenScale.x) / 2.0f;
+        float halfHeight = (size.y * screenScale.y * yScale) / 2.0f;
+
+        return mouse.x >= pixelPos.x - halfWidth && mouse.x <= pixelPos.x + halfWidth &&
+            mouse.y >= pixelPos.y - halfHeight && mouse.y <= pixelPos.y + halfHeight;
     }
 
     void Draw(Shader& shader, Model& model) {
         glm::mat4 mat = glm::mat4(1.0f);
-        mat = glm::translate(mat, glm::vec3(pos, 0.0f));
-        mat = glm::scale(mat, glm::vec3(size.x, size.y * yScale, 1.0f));
+        mat = glm::translate(mat, glm::vec3(Pos(), 0.0f));
+        glm::vec2 screenScale = screen.scaleFactor();
+        mat = glm::scale(mat, glm::vec3(size.x * screenScale.x, size.y * screenScale.y, 1.0f));
         shader.setMat4("model", mat);
         model.Draw(shader);
+    }
+
+    glm::vec2 Pos() {
+        return glm::vec2(
+            pos.x * screen.w,
+            pos.y * screen.h
+        );
+    }
+
+    //debug
+    void printOnClick() {
+        std::cout << "scale_factor: " << screen.scaleFactor() << std::endl;
     }
 };
 
@@ -246,21 +268,21 @@ int main()
     float topY = screen.h / 2.0f + totalHeight / 2.0f - baseSize.y * playYScale / 2.0f;
 
     Button playButton{
-        glm::vec2(screen.w / 2.0f, topY),
+        glm::vec2(1.0f/2, 3.0f/4),
         baseSize,
         playYScale,
         "PLAY"
     };
 
     Button scoresButton{
-        glm::vec2(screen.w / 2.0f, topY - (baseSize.y * playYScale + spacing)),
+        glm::vec2(1.0f/2, 2.0f/4),
         baseSize,
         scoresYScale,
         "SCORES"
     };
 
     Button infoButton{
-        glm::vec2(screen.w / 2.0f, topY - (baseSize.y * playYScale + spacing) - (baseSize.y * scoresYScale + spacing)),
+        glm::vec2(1.0f/2, 1.0f/4),
         baseSize,
         infoYScale,
         "INFO"
@@ -320,6 +342,11 @@ int main()
             ourShader.setBool("hasTexture", false);
             infoButton.Draw(ourShader, infoButtonModel);
 
+
+            //debug
+            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
+                playButton.printOnClick();
+            }
 
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && playButton.isClicked(mousePos)) {
                 ingredients.clear();
@@ -731,6 +758,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
         screen.paddingW = 0;
         screen.h = viewport_height;
         screen.paddingH = padding;
+
     }
 }
 

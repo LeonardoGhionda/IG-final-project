@@ -22,6 +22,10 @@ public:
 		w = startW;
 	}
 
+	glm::vec2 scaleFactor() {
+		return glm::vec2((float)w / startW, (float)h / startH);
+	}
+
 private:
 	unsigned int startW, startH;
 
