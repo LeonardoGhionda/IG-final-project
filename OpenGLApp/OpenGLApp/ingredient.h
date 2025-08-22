@@ -90,13 +90,15 @@ public:
 
         // Screen-space (pixel,  0 - width/height)
         glm::vec2 screenPos;
-        screenPos.x = (normalizedCS.x + 1.0f) * 0.5f * screen.w;
-        screenPos.y = (1.0f - (normalizedCS.y + 1.0f) * 0.5f) * screen.h;
+        screenPos.x = (normalizedCS.x + 1.0f) * 0.5f * screen.w + screen.paddingW;
+        screenPos.y = (1.0f - (normalizedCS.y + 1.0f) * 0.5f) * screen.h + screen.paddingH;
         return screenPos;
     }
 
     bool hit(glm::vec2 mousePos, glm::mat4 projection, glm::mat4 view) {
         glm::vec2 pos = MCSPosition(projection, view);
+        std::cout << "mouse"<< mousePos <<std::endl;
+        std::cout << "object"<< pos<<std::endl;
         bool hit =  glm::distance(mousePos, pos) <= CHB_MCS(projection, view)*1.5f;
         return hit;
     }
@@ -135,6 +137,7 @@ private:
     glm::vec2 directionToCenter; //direction towards the center of the screen shifted by a small random angle
 
 
+    //circular hitbox in mouse coord system
     float CHB_MCS(glm::mat4 projection, glm::mat4 view) {
 
         if (pCHB > 0.0) return pCHB; //no need to compute again
