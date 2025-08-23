@@ -156,6 +156,7 @@
     <ClCompile Include="TextRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="button.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="focusbox.h" />
     <ClInclude Include="ingredient.h" />

@@ -71,6 +71,9 @@
     <ClInclude Include="focusbox.h">
       <Filter>File di origine</Filter>
     </ClInclude>
+    <ClInclude Include="button.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader.fs">
