@@ -501,7 +501,21 @@ int main()
                 gameState = GameState::SCORES;
             }
 }
-
+        else if(gameState == GameState::PAUSED) {
+            glDisable(GL_DEPTH_TEST);
+            textShader.use();
+            glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+            textShader.setMat4("projection", projection);
+            std::string pauseText = "GAME PAUSED";
+            textRenderer.DrawText(textShader, pauseText, screen.w / 2 - 150.0f,
+                screen.h / 2, 1.5f, glm::vec3(1.0f, 0.5f, 0.0f));
+            std::string resumeText = "Press P to RESUME";
+            textRenderer.DrawText(textShader, resumeText, screen.w / 2 - 200.0f,
+                screen.h / 2 - 100.0f, 1.0f, glm::vec3(1.0f));
+            std::string exitText = "Press ESC to EXIT to MENU";
+            textRenderer.DrawText(textShader, exitText, screen.w / 2 - 220.0f,
+                screen.h / 2 - 150.0f, 1.0f, glm::vec3(1.0f));
+		}
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -599,6 +613,7 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
         }
         else if (gameState == GameState::PAUSED) {
             gameState = GameState::PLAYING;
+
         }
     }
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE) {
@@ -633,7 +648,7 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
             
         }
         else if (gameState == GameState::SCORES || gameState == GameState::INFO || gameState==GameState::PAUSED) {
-
+           
             gameState = GameState::MENU;            
         }
         else if(gameState == GameState::MENU ) {
@@ -643,6 +658,7 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
             glfwSetWindowShouldClose(window, true);
 		}
 	}
+ 
 
     // Rilascio ESC: sblocca il keyLock
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_RELEASE) {
