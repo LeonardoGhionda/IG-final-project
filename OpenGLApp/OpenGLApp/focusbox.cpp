@@ -51,8 +51,9 @@ glm::vec2 FocusBox::GetSize() const {
 }
 
 bool FocusBox::Contains(const glm::vec2& screenPoint) const {
-    return screenPoint.x >= center.x - size.x && screenPoint.x <= center.x + size.x &&
-        screenPoint.y >= center.y - size.y && screenPoint.y <= center.y + size.y;
+    glm::vec2 pos(center.x * screen.w, center.y * screen.h);
+    return screenPoint.x >= pos.x - size.x && screenPoint.x <= pos.x + size.x &&
+        screenPoint.y >= pos.y - size.y && screenPoint.y <= pos.y + size.y;
 }
 
 void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {

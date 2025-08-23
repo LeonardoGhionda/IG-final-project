@@ -84,26 +84,7 @@ GameState gameState = GameState::MENU;
 std::deque<Ingredient> ingredients;
 std::string playerName = "Player1"; // Default player name, can be changed later
 //Ingredient* active = nullptr;
-struct Button {
-    glm::vec2 pos;
-    glm::vec2 size;
-    float yScale;
-    std::string label;
 
-    bool isClicked(glm::vec2 mouse) const {
-        float halfHeight = size.y * yScale / 2.0f;
-        return mouse.x >= pos.x - size.x / 2 && mouse.x <= pos.x + size.x / 2 &&
-            mouse.y >= pos.y - halfHeight && mouse.y <= pos.y + halfHeight;
-    }
-
-    void Draw(Shader& shader, Model& model) {
-        glm::mat4 mat = glm::mat4(1.0f);
-        mat = glm::translate(mat, glm::vec3(pos, 0.0f));
-        mat = glm::scale(mat, glm::vec3(size.x, size.y * yScale, 1.0f));
-        shader.setMat4("model", mat);
-        model.Draw(shader);
-    }
-};
 
 bool customWindowShouldClose(GLFWwindow* window) {
     return glfwWindowShouldClose(window) ;
@@ -374,6 +355,8 @@ int main()
                 SpawnRandomIngredient();
                 spawnTimer = 0.0f;
             }
+            glDisable(GL_DEPTH_TEST);
+
             glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
             glm::mat4 view = camera.GetViewMatrix();
            
@@ -397,12 +380,15 @@ int main()
                 screen.h - 50.0f, 1.0f, glm::vec3(1.0f));
 
             //  focus box
-            
+        	focusShader.use();
+            glLineWidth(2.0f);
             focusBox.Draw(focusShader, screen.w, screen.h);
+			glEnable(GL_DEPTH_TEST);
             glm::vec2 c = focusBox.GetCenter();
             glm::vec2 half = focusBox.GetSize()*1.1f;
-            c.x = glm::clamp(c.x, half.x, (float)screen.w - half.x);
-            c.y = glm::clamp(c.y, half.y, (float)screen.h - half.y);
+            glm::vec2 halfN(half.x / screen.w, half.y / screen.h); 
+            c.x = glm::clamp(c.x, halfN.x, 1.0f - halfN.x);
+            c.y = glm::clamp(c.y, halfN.y, 1.0f - halfN.y);
             focusBox.SetCenter(c);
             //click oggetti
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
@@ -559,15 +545,17 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
         }
     }
     if (gameState == GameState::PLAYING) {
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) focusBox.Move({ 0.0f,  currentSpeed });
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) focusBox.Move({ 0.0f, -currentSpeed });
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) focusBox.Move({ -currentSpeed, 0.0f });
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) focusBox.Move({ currentSpeed, 0.0f });
+        float dx = currentSpeed / screen.w;
+        float dy = currentSpeed / screen.h;
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) focusBox.Move({ 0.0f,  dy });
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) focusBox.Move({ 0.0f, -dy });
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) focusBox.Move({ -dx,  0.0f });
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) focusBox.Move({ dx,  0.0f });
         // (opzionale) frecce:
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) focusBox.Move({ 0.0f,  currentSpeed });
-        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) focusBox.Move({ 0.0f, -currentSpeed });
-        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) focusBox.Move({ -currentSpeed, 0.0f });
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) focusBox.Move({ currentSpeed, 0.0f });
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) focusBox.Move({ 0.0f,  dy });
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) focusBox.Move({ 0.0f,-dy });
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) focusBox.Move({ -dx, 0.0f });
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) focusBox.Move({ dx, 0.0f });
     }
     //Camera movement
     /*
