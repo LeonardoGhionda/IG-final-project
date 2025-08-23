@@ -12,7 +12,13 @@ uniform vec2 rectMin;
 uniform vec2 rectMax; 
 
 
+//shader to blur BACKGROUND if outside focusRectangle 
+
 void main() {
+
+    int blurIntensity = 3; 
+    int darkness = 2;
+
     vec3 color = vec3(0.0);
     bool inside = TexCoords.x >= rectMin.x && TexCoords.x <= rectMax.x &&
                   TexCoords.y >= rectMin.y && TexCoords.y <= rectMax.y;
@@ -21,15 +27,14 @@ void main() {
         color = vec3(texture(texture_diffuse1, TexCoords));
     }
     else {
-        for (int x = -2; x <= 2; x++) {
-            for (int y = -2; y <= 2; y++) {
+        for (int x = -blurIntensity; x <= blurIntensity; x++) {
+            for (int y = -blurIntensity; y <= blurIntensity; y++) {
                 vec2 offset = vec2(x, y) * uTexelSize;
                 color += texture(texture_diffuse1, TexCoords + offset).rgb;
             }
         }
-        color /= 25.0; 
+        color /= 2*blurIntensity * 2*blurIntensity * darkness; 
     }
     
     FragColor = vec4(color, 1.0);
 }
-

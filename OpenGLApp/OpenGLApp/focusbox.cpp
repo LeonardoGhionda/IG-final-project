@@ -67,8 +67,8 @@ void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {
     );
     model = glm::translate(model, glm::vec3(pos, 0.0f));
 
-    glm::vec2 screenScale = screen.scaleFactor();
-    model = glm::scale(model, glm::vec3(size.x * screenScale.x, size.y * screenScale.y, 1.0f));
+    
+    model = glm::scale(model, glm::vec3(getScaledSize(), 1.0f));
 
     shader.setMat4("projection", projection);
     shader.setMat4("model", model);
@@ -79,9 +79,7 @@ void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {
     glDrawArrays(GL_LINE_LOOP, 0, 4);
     glBindVertexArray(0);
 }
-glm::vec2 FocusBox::GetPosition() const {
-    return center;
-}
+
 bool FocusBox::IsActive() const{
     return true;
 }
@@ -93,4 +91,10 @@ void FocusBox::printOnClick(){
         center.y * screen.h
     );
     std::cout << "box: " << pos.x << ", " << pos.y << std::endl;
+}
+
+glm::vec2 FocusBox::getScaledSize()
+{
+    glm::vec2 screenScale = screen.scaleFactor();
+    return glm::vec2(size.x * screenScale.x, size.y * screenScale.y);
 }
