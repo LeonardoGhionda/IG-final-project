@@ -25,7 +25,7 @@
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow* window);
+void processInput(GLFWwindow* window,FocusBox& focusBox);
 
 
 float lastX = screen.w / 2.0f;
@@ -41,7 +41,6 @@ float focusSpeed = 400.0f; // puoi metterlo come variabile globale
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-
 //spawn
 float spawnInterval = 2.0f;   // intervallo tra un lancio e l'altro (in secondi)
 float spawnTimer = 0.0f;      // tempo trascorso dall'ultimo lancio
@@ -57,6 +56,7 @@ bool isTypingName = false;
 
 //fullscreen
 bool fullscreen = false;
+bool Esc = false;
 
 glm::vec2 mousePos = glm::vec2(0.0f);
 glm::vec2 mouseScreenPos = glm::vec2(0.0f);
@@ -84,6 +84,26 @@ GameState gameState = GameState::MENU;
 std::deque<Ingredient> ingredients;
 std::string playerName = "Player1"; // Default player name, can be changed later
 //Ingredient* active = nullptr;
+struct Button {
+    glm::vec2 pos;
+    glm::vec2 size;
+    float yScale;
+    std::string label;
+
+    bool isClicked(glm::vec2 mouse) const {
+        float halfHeight = size.y * yScale / 2.0f;
+        return mouse.x >= pos.x - size.x / 2 && mouse.x <= pos.x + size.x / 2 &&
+            mouse.y >= pos.y - halfHeight && mouse.y <= pos.y + halfHeight;
+    }
+
+    void Draw(Shader& shader, Model& model) {
+        glm::mat4 mat = glm::mat4(1.0f);
+        mat = glm::translate(mat, glm::vec3(pos, 0.0f));
+        mat = glm::scale(mat, glm::vec3(size.x, size.y * yScale, 1.0f));
+        shader.setMat4("model", mat);
+        model.Draw(shader);
+    }
+};
 
 bool customWindowShouldClose(GLFWwindow* window) {
     return glfwWindowShouldClose(window) ;
@@ -91,16 +111,27 @@ bool customWindowShouldClose(GLFWwindow* window) {
 
 void SpawnRandomIngredient() {
     std::vector<std::string> allIngredients = {
-        "resources/ball/ball.obj",
+           "resources/ball/ball.obj",
         "resources/ingredients/pumpkin/pumpkin.obj",
-        "resources/ingredients/tomato/tomato.obj"
+        "resources/ingredients/tomato/tomato.obj",
+        "resources/ingredients/butter/butter.obj",
+         "resources/ingredients/chocolate/chocolate.obj",
+         "resources/ingredients/flour/flour.obj",
+         "resources/ingredients/eggs/eggs.obj",
+         "resources/ingredients/honey/honey.obj",
+         "resources/ingredients/lemon/lemon.obj",
+         "resources/ingredients/milk/milk.obj",
+         "resources/ingredients/jam/jam.obj",
+         "resources/ingredients/vanilla/vanilla.obj",
+         "resources/ingredients/apple/apple.obj",
+         "resources/ingredients/strawberry/strawberry.obj"
         // altri ingredienti qui
     };
    
     int index = rand() % allIngredients.size();
     glm::vec2 spawn = Ingredient::RandomSpawnPoint();
 
-    Ingredient newIngredient(allIngredients[index].c_str(), spawn, 1.0f);
+    Ingredient newIngredient(allIngredients[index].c_str(), spawn, 0.3f);
 
 
     // Direzione verso l'alto e centro, con piccola deviazione casuale
@@ -115,6 +146,7 @@ void SpawnRandomIngredient() {
     float speed = 8.0f + static_cast<float>(rand() % 40) / 4.0f;
 
     newIngredient.SetVelocity(dir * speed);
+    newIngredient.updateTime();
     ingredients.push_back(newIngredient);
 }
 
@@ -266,7 +298,7 @@ int main()
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        processInput(window);
+        processInput(window,focusBox);
 
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -311,7 +343,8 @@ int main()
                 score = 0;
 				spawnTimer = 0.0f; // Reset timer
                 gameState = GameState::PLAYING;
-
+                glEnable(GL_DEPTH_TEST);
+                continue;
 				/*
                 //inserisco 4 ingredienti
                 for (int i = 0; i < 4; ++i)
@@ -334,7 +367,8 @@ int main()
 
         }
         else if (gameState == GameState::PLAYING) {
-            
+            glEnable(GL_DEPTH_TEST);
+
             spawnTimer += deltaTime;
             if (spawnTimer >= spawnInterval) {
                 SpawnRandomIngredient();
@@ -342,8 +376,10 @@ int main()
             }
             glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
             glm::mat4 view = camera.GetViewMatrix();
+           
             ourShader.setMat4("projection", perspectiveProj);
             ourShader.setMat4("view", view);
+
             for (auto& ing : ingredients) {
                 ing.Move();
                 ourShader.setMat4("model", ing.GetModelMatrix());
@@ -352,108 +388,23 @@ int main()
                 ing.Draw(ourShader);
             }
 
-            if (!ingredients.empty()) {
-               // ourShader.setMat4("model", active->GetModelMatrix());
-                //ourShader.setBool("hasTexture", true);
-               // ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+            // Mostra punteggio
+            textShader.use();
+            glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+            textShader.setMat4("projection", projection);
+            std::string scoreText = "Score: " + std::to_string(score);
+            textRenderer.DrawText(textShader, scoreText, screen.w - 200.0f,
+                screen.h - 50.0f, 1.0f, glm::vec3(1.0f));
 
-              //  active->Move();
-              //  active->Draw(ourShader);
-
-                // Aggiorna e disegna tutti gli ingredienti
-                for (auto& ing : ingredients) {
-                    ing.Move();
-                    ourShader.setMat4("model", ing.GetModelMatrix());
-                    ourShader.setBool("hasTexture", true);
-                    ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-                    ing.Draw(ourShader);
-                }
-
-                //Mostra punteggio             
-                textShader.use();
-                glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
-                textShader.setMat4("projection", projection);
-                std::string scoreText = "Score: " + std::to_string(score);
-                glm::vec3 color = glm::vec3(1.0f); // bianco
-                textRenderer.DrawText(textShader, scoreText, screen.w - 200.0f, screen.h - 50.0f, 1.0f, color);
-                
-
-                // USA mouseScreenPos per click su ingredienti
-               /* if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) &&
-                    active->hit(mouseScreenPos, perspectiveProj, view)) {
-                    ingredients.pop_front();
-                    if (!ingredients.empty()) {
-                        active = &ingredients[0];
-                        active->AddVelocity(active->getDirectionToCenter() * 2.0f);
-                        active->updateTime();
-                       // score++;
-                    }
-                }*/
-
-                //mouse input
-
-               /* if (active && (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) && 
-                    active->hit(mouseScreenPos, perspectiveProj, view)){
-                  
-                    if (!isDragging) {
-                        mouseTrail.clear();  // inizia nuovo taglio
-                        isDragging = true;
-
-                        // Proietta la posizione dell'oggetto sullo schermo
-                        glm::vec4 clipPos = perspectiveProj * view * glm::vec4(active->Position(), 1.0f);
-                        clipPos /= clipPos.w;
-
-                        float screenX = ((clipPos.x + 1.0f) / 2.0f) * screen.w;
-                        float screenY = ((clipPos.y + 1.0f) / 2.0f) * screen.h;
-                        glm::vec2 projected = glm::vec2(screenX, screenY);
-
-                        if (focusBox.Contains(projected)) {
-                            score++; //colpito dentro il focus
-                        }
-                        else {
-                            score = std::max(0, score - 1); //fuori dal focus, penalità
-                        }
-                        /*
-                        ingredients.pop_front();
-                        if (!ingredients.empty()) {
-                            active = &ingredients[0];
-                            active->AddVelocity(active->getDirectionToCenter() * 2.0f);
-                            active->updateTime();
-                        }
-                        else {
-                            active = nullptr;
-                        }
-                    }
-
-                    mouseTrail.push_back(mousePos);
-                }
-                else {
-                    if (isDragging) {
-                        isDragging = false;
-                        // qui potrai processare la combo sugli ingredienti colpiti
-                    }
-                }
-                if (mouseTrail.size() > 30) {
-                    mouseTrail.erase(mouseTrail.begin(), mouseTrail.begin() + 5);
-                }
-                  */
-				//move focus box
-                // Movimento della focus box
-                glm::vec2 moveDelta(0.0f);
-                float speed = 0.4f;
-                if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveDelta.x -= speed * deltaTime;
-                if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDelta.x += speed * deltaTime;
-                if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDelta.y += speed * deltaTime;
-                if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) moveDelta.y -= speed * deltaTime;
-
-                focusBox.Move(moveDelta);
-
-                focusBox.Draw(focusShader, screen.w, screen.h);
-               
-
-
-            }
-
+            //  focus box
+            
+            focusBox.Draw(focusShader, screen.w, screen.h);
+            glm::vec2 c = focusBox.GetCenter();
+            glm::vec2 half = focusBox.GetSize()*1.1f;
+            c.x = glm::clamp(c.x, half.x, (float)screen.w - half.x);
+            c.y = glm::clamp(c.y, half.y, (float)screen.h - half.y);
+            focusBox.SetCenter(c);
+            //click oggetti
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
                 for (auto it = ingredients.begin(); it != ingredients.end();) {
                     if (it->hit(mouseScreenPos, perspectiveProj, view)) {
@@ -474,7 +425,6 @@ int main()
 
 
         }
-
         else if (gameState == GameState::SCORES) {
 
             ScoreManager manager;
@@ -556,7 +506,21 @@ int main()
                 gameState = GameState::SCORES;
             }
 }
-
+        else if(gameState == GameState::PAUSED) {
+            glDisable(GL_DEPTH_TEST);
+            textShader.use();
+            glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+            textShader.setMat4("projection", projection);
+            std::string pauseText = "GAME PAUSED";
+            textRenderer.DrawText(textShader, pauseText, screen.w / 2 - 150.0f,
+                screen.h / 2, 1.5f, glm::vec3(1.0f, 0.5f, 0.0f));
+            std::string resumeText = "Press P to RESUME";
+            textRenderer.DrawText(textShader, resumeText, screen.w / 2 - 200.0f,
+                screen.h / 2 - 100.0f, 1.0f, glm::vec3(1.0f));
+            std::string exitText = "Press ESC to EXIT to MENU";
+            textRenderer.DrawText(textShader, exitText, screen.w / 2 - 220.0f,
+                screen.h / 2 - 150.0f, 1.0f, glm::vec3(1.0f));
+		}
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -574,8 +538,10 @@ int main()
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow* window)
+void processInput(GLFWwindow* window, FocusBox& focusBox)
 {
+
+    float currentSpeed = focusSpeed * deltaTime;
     /*
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -584,6 +550,25 @@ void processInput(GLFWwindow* window)
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     */
 
+    //Space key 
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+
+        // se premi SPACE aumenta la velocità (es. raddoppia)
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+            currentSpeed *= 8.0f; // boost mentre tieni premuto spazio
+        }
+    }
+    if (gameState == GameState::PLAYING) {
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) focusBox.Move({ 0.0f,  currentSpeed });
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) focusBox.Move({ 0.0f, -currentSpeed });
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) focusBox.Move({ -currentSpeed, 0.0f });
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) focusBox.Move({ currentSpeed, 0.0f });
+        // (opzionale) frecce:
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) focusBox.Move({ 0.0f,  currentSpeed });
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) focusBox.Move({ 0.0f, -currentSpeed });
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) focusBox.Move({ -currentSpeed, 0.0f });
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) focusBox.Move({ currentSpeed, 0.0f });
+    }
     //Camera movement
     /*
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -633,6 +618,7 @@ void processInput(GLFWwindow* window)
         }
         else if (gameState == GameState::PAUSED) {
             gameState = GameState::PLAYING;
+
         }
     }
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE) {
@@ -640,22 +626,14 @@ void processInput(GLFWwindow* window)
     }
 
 
-	//Space key 
-    if(glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-
-        //se sei in Playng
-        if (gameState == GameState::PLAYING && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-          //deve fare qualcosa
-        }
-	}
 
 	// Escape key to return to menu or exit
-    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_ESCAPE]) {
+        keys.keyLock[GLFW_KEY_ESCAPE] = true;
+     
         if (gameState == GameState::PLAYING) {
-
-           
-              endGame = true;
-              
+                endGame = true;
+                
               /*  std::cout << "\n--- FINE PARTITA ---\n";
                 std::cout << "Inserisci il tuo nome: ";
 
@@ -674,18 +652,23 @@ void processInput(GLFWwindow* window)
                 gameState = GameState::NAME_INPUT;
             
         }
-        else if (gameState == GameState::SCORES || gameState == GameState::INFO) {
-            gameState = GameState::MENU;
+        else if (gameState == GameState::SCORES || gameState == GameState::INFO || gameState==GameState::PAUSED) {
+           
+            gameState = GameState::MENU;            
         }
-        if(gameState == GameState::MENU) {
+        else if(gameState == GameState::MENU ) {
             ingredients.clear();
             //active = nullptr;
             endGame = false;
             glfwSetWindowShouldClose(window, true);
 		}
 	}
+ 
 
-	
+    // Rilascio ESC: sblocca il keyLock
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_RELEASE) {
+        keys.keyLock[GLFW_KEY_ESCAPE] = false;
+    }
 
 }
 
