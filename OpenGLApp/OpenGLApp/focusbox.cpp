@@ -51,25 +51,22 @@ glm::vec2 FocusBox::GetSize() const {
 }
 
 bool FocusBox::Contains(const glm::vec2& screenPoint) const {
-    glm::vec2 pos(center.x * screen.w, center.y * screen.h);
-    return screenPoint.x >= pos.x - size.x && screenPoint.x <= pos.x + size.x &&
-        screenPoint.y >= pos.y - size.y && screenPoint.y <= pos.y + size.y;
+    // center e size sono in pixel (size = semi-lati)
+    return screenPoint.x >= center.x - size.x && screenPoint.x <= center.x + size.x &&
+        screenPoint.y >= center.y - size.y && screenPoint.y <= center.y + size.y;
 }
 
 void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {
     shader.use();
 
-    glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(screenWidth), 0.0f, static_cast<float>(screenHeight));
-    glm::mat4 model = glm::mat4(1.0f);
+    // Ortho in pixel
+    glm::mat4 projection = glm::ortho(0.0f, (float)screenWidth, 0.0f, (float)screenHeight);
 
-    glm::vec2 pos =  glm::vec2(
-        center.x * screen.w,
-        center.y * screen.h
-    );
-    model = glm::translate(model, glm::vec3(pos, 0.0f));
+    // Unica TRASLAZIONE in pixel (niente * screen.w/h)
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(center, 0.0f));
 
-    glm::vec2 screenScale = screen.scaleFactor();
-    model = glm::scale(model, glm::vec3(size.x * screenScale.x, size.y * screenScale.y, 1.0f));
+    // Unica SCALA: size = semi-lati (quad [-1,1] -> larghezza 2*size.x)
+    model = glm::scale(model, glm::vec3(size.x, size.y, 1.0f));
 
     shader.setMat4("projection", projection);
     shader.setMat4("model", model);
@@ -79,6 +76,7 @@ void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {
     glDrawArrays(GL_LINE_LOOP, 0, 4);
     glBindVertexArray(0);
 }
+
 glm::vec2 FocusBox::GetPosition() const {
     return center;
 }

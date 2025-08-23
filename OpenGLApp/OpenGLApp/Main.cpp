@@ -189,7 +189,7 @@ int main()
         return -1;
     }
     FocusBox focusBox(glm::vec2(200.0f, 120.0f)); // larghezza 200, altezza 120
-    focusBox.SetCenter(glm::vec2(1.0f / 2.0f, 1.0f / 2.0f)); //cambiato da pixel a percentuale schermo
+    focusBox.SetCenter(glm::vec2(screen.w / 2.0f, screen.h / 2.0f));
 
     Shader textShader("text.vs", "text.fs"); // Shader per testo
     if (!textRenderer.Load("resources/arial.ttf", 48)) {
@@ -355,7 +355,7 @@ int main()
                 SpawnRandomIngredient();
                 spawnTimer = 0.0f;
             }
-            glDisable(GL_DEPTH_TEST);
+            
 
             glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
             glm::mat4 view = camera.GetViewMatrix();
@@ -371,6 +371,7 @@ int main()
                 ing.Draw(ourShader);
             }
 
+            glDisable(GL_DEPTH_TEST);
             // Mostra punteggio
             textShader.use();
             glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
@@ -380,20 +381,22 @@ int main()
                 screen.h - 50.0f, 1.0f, glm::vec3(1.0f));
 
             //  focus box
-        	focusShader.use();
+        	
+            glm::vec2 c = focusBox.GetCenter();
+            glm::vec2 half = focusBox.GetSize();
+            const float pad = 1.0f;                   // 1px di margine
+            c.x = glm::clamp(c.x, half.x + pad, (float)screen.w - half.x - pad);
+            c.y = glm::clamp(c.y, half.y + pad, (float)screen.h - half.y - pad);
+            focusBox.SetCenter(c);
+
+            focusShader.use();
             glLineWidth(2.0f);
             focusBox.Draw(focusShader, screen.w, screen.h);
-			glEnable(GL_DEPTH_TEST);
-            glm::vec2 c = focusBox.GetCenter();
-            glm::vec2 half = focusBox.GetSize()*1.1f;
-            glm::vec2 halfN(half.x / screen.w, half.y / screen.h); 
-            c.x = glm::clamp(c.x, halfN.x, 1.0f - halfN.x);
-            c.y = glm::clamp(c.y, halfN.y, 1.0f - halfN.y);
-            focusBox.SetCenter(c);
+            glEnable(GL_DEPTH_TEST);
             //click oggetti
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
                 for (auto it = ingredients.begin(); it != ingredients.end();) {
-                    if (it->hit(mouseScreenPos, perspectiveProj, view)) {
+                    if (it->hit(mousePos, perspectiveProj, view)) {
                         if (focusBox.Contains(mousePos)) {
                             score++;
                         }
@@ -545,17 +548,19 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
         }
     }
     if (gameState == GameState::PLAYING) {
-        float dx = currentSpeed / screen.w;
-        float dy = currentSpeed / screen.h;
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) focusBox.Move({ 0.0f,  dy });
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) focusBox.Move({ 0.0f, -dy });
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) focusBox.Move({ -dx,  0.0f });
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) focusBox.Move({ dx,  0.0f });
+        float s = focusSpeed * deltaTime;
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) s *= 8.0f;
+
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) focusBox.Move({ 0.0f,  s });
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) focusBox.Move({ 0.0f, -s });
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) focusBox.Move({ -s,   0.0f });
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) focusBox.Move({ s,   0.0f });
+
         // (opzionale) frecce:
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) focusBox.Move({ 0.0f,  dy });
-        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) focusBox.Move({ 0.0f,-dy });
-        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) focusBox.Move({ -dx, 0.0f });
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) focusBox.Move({ dx, 0.0f });
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) focusBox.Move({ 0.0f,  s });
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) focusBox.Move({ 0.0f,-s });
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) focusBox.Move({ -s, 0.0f });
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) focusBox.Move({ s, 0.0f });
     }
     //Camera movement
     /*
@@ -581,15 +586,34 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
         glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
 
-        screen.w = mode->width;
-        screen.h = mode->height;
+        int fbw, fbh;
+        glfwGetFramebufferSize(window, &fbw, &fbh);
+        framebuffer_size_callback(window, fbw, fbh);
+        glm::vec2 c = focusBox.GetCenter();
+        glm::vec2 half = focusBox.GetSize();
+        const float padpx = 1.0f;
+        c.x = glm::clamp(c.x, half.x + padpx, (float)screen.w - half.x - padpx);
+        c.y = glm::clamp(c.y, half.y + padpx, (float)screen.h - half.y - padpx);
+        focusBox.SetCenter(c);
         
 
     }
     else if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == true){
-        screen.resetSize();
+        keys.keyLock[GLFW_KEY_F] = true;
+        fullscreen = false;
+
+        // Torna a windowed e richiama il callback
+        screen.resetSize(); // tua funzione
         glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
-		fullscreen = !fullscreen;
+        int fbw, fbh;
+        glfwGetFramebufferSize(window, &fbw, &fbh);
+        framebuffer_size_callback(window, fbw, fbh);
+        glm::vec2 c = focusBox.GetCenter();
+        glm::vec2 half = focusBox.GetSize();
+        const float padpx = 1.0f;
+        c.x = glm::clamp(c.x, half.x + padpx, (float)screen.w - half.x - padpx);
+        c.y = glm::clamp(c.y, half.y + padpx, (float)screen.h - half.y - padpx);
+        focusBox.SetCenter(c);
     }
 
     if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
