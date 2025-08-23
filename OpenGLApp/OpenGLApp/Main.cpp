@@ -202,6 +202,7 @@ int main()
     Shader ourShader("shader.vs", "shader.fs");
 	//shader per focus box
     Shader focusShader("focusbox.vs", "focusbox.fs");
+    Shader blurShader("shader.vs", "shader_blur.fs");
     // load models
     // -----------
     Model backgroundPlane("resources/background/background.obj");
@@ -270,23 +271,34 @@ int main()
 
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        ourShader.use();
+        blurShader.use();
+
+        glDisable(GL_DEPTH_TEST);
+
+        // Background
+        glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+        blurShader.setMat4("projection", orthoProj);
+        blurShader.setMat4("view", glm::mat4(1.0f));
+
+        
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+        blurShader.setMat4("model", model);
+        blurShader.setBool("hasTexture", true);  // background ha texture
+        blurShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
+        blurShader.setVec2("uTexelSize", glm::vec2(1.0f/screen.w, 1.0f/screen.h));
+        blurShader.setVec2("rectMin", glm::vec2(0.3,0.3));
+        blurShader.setVec2("rectMax", glm::vec2(0.7, 0.7));
+
+        backgroundPlane.Draw(blurShader);
+
+
 
         if (gameState == GameState::MENU) {
-            glDisable(GL_DEPTH_TEST);
 
-            glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-            ourShader.setMat4("projection", orthoProj);
-            ourShader.setMat4("view", glm::mat4(1.0f));
-
-            // Background
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
-            ourShader.setMat4("model", model);
-            ourShader.setBool("hasTexture", true);  // background ha texture
-            ourShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
-            backgroundPlane.Draw(ourShader);
+        }
+        else if (gameState == GameState::MENU){
 
             // Play button (senza texture, colore da MTL o fisso)
             ourShader.setBool("hasTexture", false);
@@ -299,12 +311,6 @@ int main()
             // Info button
             ourShader.setBool("hasTexture", false);
             infoButton.Draw(ourShader, infoButtonModel);
-
-
-            //debug
-            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
-                focusBox.printOnClick();
-            }
 
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && playButton.isClicked(mousePos)) {
                 ingredients.clear();
@@ -509,7 +515,6 @@ int main()
             }
 
         }
-
         else if (gameState == GameState::NAME_INPUT) {
             glDisable(GL_DEPTH_TEST);
             textShader.use();
@@ -555,19 +560,18 @@ int main()
                 // Vai alla classifica
                 gameState = GameState::SCORES;
             }
-}
+        }
 
 
         glfwSwapBuffers(window);
         glfwPollEvents();
         keys.Update(window);
 
-        }
+    }
         
     
     // glfw: terminate, clearing all previously allocated GLFW resources.
-        // ------------------------------------------------------------------
-
+    // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
 }

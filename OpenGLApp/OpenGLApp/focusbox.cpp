@@ -72,8 +72,9 @@ void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {
 
     shader.setMat4("projection", projection);
     shader.setMat4("model", model);
-    shader.setVec3("diffuseColor", glm::vec3(1.0f, 0.0f, 0.0f));
+    shader.setVec3("diffuseColor", glm::vec3(0.0f, 0.0f, 1.0f));
 
+    glLineWidth(5.0f);
     glBindVertexArray(VAO);
     glDrawArrays(GL_LINE_LOOP, 0, 4);
     glBindVertexArray(0);

@@ -82,6 +82,7 @@
     <None Include="shader.vs">
       <Filter>File di origine</Filter>
     </None>
+    <None Include="shader_blur.fs" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="score.txt" />

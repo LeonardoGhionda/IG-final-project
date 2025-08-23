@@ -5,7 +5,7 @@ in vec2 TexCoords;
 
 uniform sampler2D texture_diffuse1;
 uniform bool hasTexture;
-uniform vec3 diffuseColor;  // <-- nuovo: colore dal materiale
+uniform vec3 diffuseColor;  
 
 void main()
 {
@@ -13,7 +13,7 @@ void main()
     if (hasTexture) {
         outColor = texture(texture_diffuse1, TexCoords);
     } else {
-        outColor = vec4(diffuseColor, 1.0); // usa direttamente il colore del materiale
+        outColor = vec4(diffuseColor, 1.0); 
     }
 
     FragColor = outColor;
