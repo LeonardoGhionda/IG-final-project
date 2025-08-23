@@ -3,6 +3,11 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
+#include <iostream>
+
+#include "screen.h"
+extern Screen screen;
+
 FocusBox::FocusBox(const glm::vec2& size) : size(size), center(0.0f, 0.0f) {
     InitRenderData();
 }
@@ -55,8 +60,15 @@ void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {
 
     glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(screenWidth), 0.0f, static_cast<float>(screenHeight));
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(center, 0.0f));
-    model = glm::scale(model, glm::vec3(size.x, size.y, 1.0f));
+
+    glm::vec2 pos =  glm::vec2(
+        center.x * screen.w,
+        center.y * screen.h
+    );
+    model = glm::translate(model, glm::vec3(pos, 0.0f));
+
+    glm::vec2 screenScale = screen.scaleFactor();
+    model = glm::scale(model, glm::vec3(size.x * screenScale.x, size.y * screenScale.y, 1.0f));
 
     shader.setMat4("projection", projection);
     shader.setMat4("model", model);
@@ -71,4 +83,13 @@ glm::vec2 FocusBox::GetPosition() const {
 }
 bool FocusBox::IsActive() const{
     return true;
+}
+
+// debug
+void FocusBox::printOnClick(){
+    glm::vec2 pos = glm::vec2(
+        center.x * screen.w,
+        center.y * screen.h
+    );
+    std::cout << "box: " << pos.x << ", " << pos.y << std::endl;
 }

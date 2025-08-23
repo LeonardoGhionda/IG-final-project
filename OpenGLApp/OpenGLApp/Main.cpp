@@ -88,6 +88,7 @@ std::string playerName = "Player1"; // Default player name, can be changed later
 bool customWindowShouldClose(GLFWwindow* window) {
     return glfwWindowShouldClose(window) ;
 }
+
 void SpawnRandomIngredient() {
     std::vector<std::string> allIngredients = {
         "resources/ball/ball.obj",
@@ -175,7 +176,7 @@ int main()
         return -1;
     }
     FocusBox focusBox(glm::vec2(200.0f, 120.0f)); // larghezza 200, altezza 120
-    focusBox.SetCenter(glm::vec2(screen.w / 2.0f, screen.h / 2.0f));
+    focusBox.SetCenter(glm::vec2(1.0f / 2.0f, 1.0f / 2.0f)); //cambiato da pixel a percentuale schermo
 
     Shader textShader("text.vs", "text.fs"); // Shader per testo
     if (!textRenderer.Load("resources/arial.ttf", 48)) {
@@ -302,7 +303,7 @@ int main()
 
             //debug
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
-                playButton.printOnClick();
+                focusBox.printOnClick();
             }
 
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && playButton.isClicked(mousePos)) {
@@ -439,10 +440,11 @@ int main()
 				//move focus box
                 // Movimento della focus box
                 glm::vec2 moveDelta(0.0f);
-                if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveDelta.x -= 400.0f * deltaTime;
-                if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDelta.x += 400.0f * deltaTime;
-                if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDelta.y += 400.0f * deltaTime;
-                if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) moveDelta.y -= 400.0f * deltaTime;
+                float speed = 0.4f;
+                if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveDelta.x -= speed * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDelta.x += speed * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDelta.y += speed * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) moveDelta.y -= speed * deltaTime;
 
                 focusBox.Move(moveDelta);
 
@@ -652,7 +654,7 @@ void processInput(GLFWwindow* window)
         if (gameState == GameState::PLAYING) {
 
            
-                endGame = true;
+              endGame = true;
               
               /*  std::cout << "\n--- FINE PARTITA ---\n";
                 std::cout << "Inserisci il tuo nome: ";

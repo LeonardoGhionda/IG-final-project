@@ -45,9 +45,4 @@ struct Button {
             pos.y * screen.h
         );
     }
-
-    //debug
-    void printOnClick() {
-        std::cout << "scale_factor: " << screen.scaleFactor() << std::endl;
-    }
 };

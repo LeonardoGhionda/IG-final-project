@@ -15,6 +15,7 @@ public:
     // Add this method to the FocusBox class declaration (public section)
     glm::vec2 GetPosition() const;
     bool IsActive() const;
+    void printOnClick();
 
 private:
     glm::vec2 center;
