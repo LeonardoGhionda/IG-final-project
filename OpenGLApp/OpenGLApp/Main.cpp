@@ -203,6 +203,7 @@ int main()
 	//shader per focus box
 	Shader focusShader("focusbox.vs", "focusbox.fs");
 	Shader blurShader("shader.vs", "shader_blur.fs");
+	Shader objBlurShader("shader.vs", "shader_blur_objs.fs");
 	// load models
 	// -----------
 	Model backgroundPlane("resources/background/background.obj");
@@ -347,6 +348,7 @@ int main()
 			glDisable(GL_DEPTH_TEST);
 
 			// Background
+			//-----------------
 			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
 			blurShader.setMat4("projection", orthoProj);
 			blurShader.setMat4("view", glm::mat4(1.0f));
@@ -361,60 +363,71 @@ int main()
 
 			backgroundPlane.Draw(blurShader);
 
-			ourShader.use();
 
+			// Ingredients
+			//---------------
+			glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+			glm::mat4 view = camera.GetViewMatrix();
 			spawnTimer += deltaTime;
 			if (spawnTimer >= spawnInterval) {
 				SpawnRandomIngredient();
 				spawnTimer = 0.0f;
 			}
-			glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-			glm::mat4 view = camera.GetViewMatrix();
-			ourShader.setMat4("projection", perspectiveProj);
-			ourShader.setMat4("view", view);
-			for (auto& ing : ingredients) {
-				ing.Move();
-				ourShader.setMat4("model", ing.GetModelMatrix());
-				ourShader.setBool("hasTexture", true);
-				ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-				ing.Draw(ourShader);
-			}
+			
+						/* viene eseguito anche 3 righe sotto, qualcuno sa se serve anche qui? o è quello sopra da togliere?
+						* ho tolto questo perchè l'altro ha il controllo su empty
+						for (auto& ing : ingredients) {
+							ing.Move();
+							objBlurShader.setMat4("model", ing.GetModelMatrix());
+							objBlurShader.setBool("hasTexture", true);
+							objBlurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+							ing.Draw(ourShader);
+						}
+						*/
 
-			if (!ingredients.empty()) {
-				
+			if (!ingredients.empty()) {	
+
 				// Aggiorna e disegna tutti gli ingredienti
+				objBlurShader.use();
+
+				objBlurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+				objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+				
+				objBlurShader.setMat4("projection", perspectiveProj);
+				objBlurShader.setMat4("view", view);
+				objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
+				objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
+
 				for (auto& ing : ingredients) {
 					ing.Move();
-					ourShader.setMat4("model", ing.GetModelMatrix());
-					ourShader.setBool("hasTexture", true);
-					ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-					ing.Draw(ourShader);
+					objBlurShader.setMat4("model", ing.GetModelMatrix());
+					objBlurShader.setBool("hasTexture", true);
+					objBlurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+					ing.Draw(objBlurShader);
+
 				}
-
-				//Mostra punteggio             
-				textShader.use();
-				glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
-				textShader.setMat4("projection", projection);
-				std::string scoreText = "Score: " + std::to_string(score);
-				glm::vec3 color = glm::vec3(1.0f); // bianco
-				textRenderer.DrawText(textShader, scoreText, screen.w - 200.0f, screen.h - 50.0f, 1.0f, color);
-
-				//move focus box
-				// Movimento della focus box
-				glm::vec2 moveDelta(0.0f);
-				float speed = 0.4f;
-				if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveDelta.x -= speed * deltaTime;
-				if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDelta.x += speed * deltaTime;
-				if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDelta.y += speed * deltaTime;
-				if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) moveDelta.y -= speed * deltaTime;
-
-				focusBox.Move(moveDelta);
-
-				focusBox.Draw(focusShader, screen.w, screen.h);
-
-
-
 			}
+
+			//Mostra punteggio             
+			textShader.use();
+			glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+			textShader.setMat4("projection", projection);
+			std::string scoreText = "Score: " + std::to_string(score);
+			glm::vec3 color = glm::vec3(1.0f); // bianco
+			textRenderer.DrawText(textShader, scoreText, screen.w - 200.0f, screen.h - 50.0f, 1.0f, color);
+
+			//move focus box
+			// Movimento della focus box
+			glm::vec2 moveDelta(0.0f);
+			float speed = 0.4f;
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveDelta.x -= speed * deltaTime;
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDelta.x += speed * deltaTime;
+			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDelta.y += speed * deltaTime;
+			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) moveDelta.y -= speed * deltaTime;
+
+			focusBox.Move(moveDelta);
+
+			focusBox.Draw(focusShader, screen.w, screen.h);
 
 			if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
 				for (auto it = ingredients.begin(); it != ingredients.end();) {

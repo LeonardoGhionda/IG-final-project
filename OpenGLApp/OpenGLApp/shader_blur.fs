@@ -4,7 +4,6 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D texture_diffuse1;
-uniform bool hasTexture;
 uniform vec3 diffuseColor;  
 uniform vec2 uTexelSize;
 
