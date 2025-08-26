@@ -51,6 +51,7 @@ glm::vec2 FocusBox::GetSize() const {
 }
 
 bool FocusBox::Contains(const glm::vec2& screenPoint) const {
+    // center e size sono in pixel (size = semi-lati)
     return screenPoint.x >= center.x - size.x && screenPoint.x <= center.x + size.x &&
         screenPoint.y >= center.y - size.y && screenPoint.y <= center.y + size.y;
 }
@@ -58,14 +59,11 @@ bool FocusBox::Contains(const glm::vec2& screenPoint) const {
 void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {
     shader.use();
 
-    glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(screenWidth), 0.0f, static_cast<float>(screenHeight));
-    glm::mat4 model = glm::mat4(1.0f);
+    // Ortho in pixel
+    glm::mat4 projection = glm::ortho(0.0f, (float)screenWidth, 0.0f, (float)screenHeight);
 
-    glm::vec2 pos =  glm::vec2(
-        center.x * screen.w,
-        center.y * screen.h
-    );
-    model = glm::translate(model, glm::vec3(pos, 0.0f));
+    // Unica TRASLAZIONE in pixel (niente * screen.w/h)
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(center, 0.0f));
 
     
     model = glm::scale(model, glm::vec3(getScaledSize(), 1.0f));

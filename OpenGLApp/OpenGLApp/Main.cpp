@@ -25,7 +25,7 @@
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow* window);
+void processInput(GLFWwindow* window,FocusBox& focusBox);
 
 
 float lastX = screen.w / 2.0f;
@@ -41,7 +41,6 @@ float focusSpeed = 400.0f; // puoi metterlo come variabile globale
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-
 //spawn
 float spawnInterval = 2.0f;   // intervallo tra un lancio e l'altro (in secondi)
 float spawnTimer = 0.0f;      // tempo trascorso dall'ultimo lancio
@@ -57,6 +56,7 @@ bool isTypingName = false;
 
 //fullscreen
 bool fullscreen = false;
+bool Esc = false;
 
 glm::vec2 mousePos = glm::vec2(0.0f);
 glm::vec2 mouseScreenPos = glm::vec2(0.0f);
@@ -85,22 +85,34 @@ std::deque<Ingredient> ingredients;
 std::string playerName = "Player1"; // Default player name, can be changed later
 //Ingredient* active = nullptr;
 
+
 bool customWindowShouldClose(GLFWwindow* window) {
 	return glfwWindowShouldClose(window);
 }
 
 void SpawnRandomIngredient() {
-	std::vector<std::string> allIngredients = {
-		"resources/ball/ball.obj",
-		"resources/ingredients/pumpkin/pumpkin.obj",
-		"resources/ingredients/tomato/tomato.obj"
-		// altri ingredienti qui
-	};
+    std::vector<std::string> allIngredients = {
+           "resources/ball/ball.obj",
+        "resources/ingredients/pumpkin/pumpkin.obj",
+        "resources/ingredients/tomato/tomato.obj",
+        "resources/ingredients/butter/butter.obj",
+         "resources/ingredients/chocolate/chocolate.obj",
+         "resources/ingredients/flour/flour.obj",
+         "resources/ingredients/eggs/eggs.obj",
+         "resources/ingredients/honey/honey.obj",
+         "resources/ingredients/lemon/lemon.obj",
+         "resources/ingredients/milk/milk.obj",
+         "resources/ingredients/jam/jam.obj",
+         "resources/ingredients/vanilla/vanilla.obj",
+         "resources/ingredients/apple/apple.obj",
+         "resources/ingredients/strawberry/strawberry.obj"
+        // altri ingredienti qui
+    };
+   
+    int index = rand() % allIngredients.size();
+    glm::vec2 spawn = Ingredient::RandomSpawnPoint();
 
-	int index = rand() % allIngredients.size();
-	glm::vec2 spawn = Ingredient::RandomSpawnPoint();
-
-	Ingredient newIngredient(allIngredients[index].c_str(), spawn, 1.0f);
+    Ingredient newIngredient(allIngredients[index].c_str(), spawn, 0.3f);
 
 
 	// Direzione verso l'alto e centro, con piccola deviazione casuale
@@ -114,8 +126,9 @@ void SpawnRandomIngredient() {
 	// Velocità in stile Fruit Ninja (8-12)
 	float speed = 8.0f + static_cast<float>(rand() % 40) / 4.0f;
 
-	newIngredient.SetVelocity(dir * speed);
-	ingredients.push_back(newIngredient);
+    newIngredient.SetVelocity(dir * speed);
+    newIngredient.updateTime();
+    ingredients.push_back(newIngredient);
 }
 
 void character_callback(GLFWwindow* window, unsigned int codepoint) {
@@ -268,7 +281,7 @@ int main()
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 
-		processInput(window);
+        processInput(window,focusBox);
 
 		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -293,8 +306,9 @@ int main()
 				ingredients.clear();
 				score = 0;
 				spawnTimer = 0.0f; // Reset timer
-				gameState = GameState::PLAYING;
-
+                gameState = GameState::PLAYING;
+                glEnable(GL_DEPTH_TEST);
+                continue;
 				/*
 				//inserisco 4 ingredienti
 				for (int i = 0; i < 4; ++i)
@@ -454,9 +468,8 @@ int main()
 			}
 
 
-		}
-
-		else if (gameState == GameState::SCORES) {
+        }
+        else if (gameState == GameState::SCORES) {
 
 			ScoreManager manager;
 			auto scores = manager.LoadScores("score.txt");
@@ -532,11 +545,25 @@ int main()
 				ScoreManager manager;
 				manager.SaveScore(playerName, score);
 
-				// Vai alla classifica
-				gameState = GameState::SCORES;
-			}
+                // Vai alla classifica
+                gameState = GameState::SCORES;
+            }
+}
+        else if(gameState == GameState::PAUSED) {
+            glDisable(GL_DEPTH_TEST);
+            textShader.use();
+            glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+            textShader.setMat4("projection", projection);
+            std::string pauseText = "GAME PAUSED";
+            textRenderer.DrawText(textShader, pauseText, screen.w / 2 - 150.0f,
+                screen.h / 2, 1.5f, glm::vec3(1.0f, 0.5f, 0.0f));
+            std::string resumeText = "Press P to RESUME";
+            textRenderer.DrawText(textShader, resumeText, screen.w / 2 - 200.0f,
+                screen.h / 2 - 100.0f, 1.0f, glm::vec3(1.0f));
+            std::string exitText = "Press ESC to EXIT to MENU";
+            textRenderer.DrawText(textShader, exitText, screen.w / 2 - 220.0f,
+                screen.h / 2 - 150.0f, 1.0f, glm::vec3(1.0f));
 		}
-
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -553,50 +580,94 @@ int main()
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow* window)
+void processInput(GLFWwindow* window, FocusBox& focusBox)
 {
-	/*
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+    float currentSpeed = focusSpeed * deltaTime;
+    /*
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
 	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS && glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL)
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	*/
 
-	//Camera movement
-	/*
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		camera.Position += glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
-	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		camera.Position -= glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		camera.Position -= glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
-	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		camera.Position += glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
+    //Space key 
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
 
-	if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	*/
+        // se premi SPACE aumenta la velocità (es. raddoppia)
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+            currentSpeed *= 8.0f; // boost mentre tieni premuto spazio
+        }
+    }
+    if (gameState == GameState::PLAYING) {
+        float s = focusSpeed * deltaTime;
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) s *= 8.0f;
 
-	//fullscreen
-	if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == false)
-	{
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) focusBox.Move({ 0.0f,  s });
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) focusBox.Move({ 0.0f, -s });
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) focusBox.Move({ -s,   0.0f });
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) focusBox.Move({ s,   0.0f });
+
+        // (opzionale) frecce:
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) focusBox.Move({ 0.0f,  s });
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) focusBox.Move({ 0.0f,-s });
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) focusBox.Move({ -s, 0.0f });
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) focusBox.Move({ s, 0.0f });
+    }
+    //Camera movement
+    /*
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        camera.Position += glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        camera.Position -= glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        camera.Position -= glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        camera.Position += glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
+   
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    */
+  
+    //fullscreen
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen==false)
+    { 
 		fullscreen = !fullscreen;
 		keys.keyLock[GLFW_KEY_F] = true;
 		GLFWmonitor* monitor = glfwGetPrimaryMonitor();
 		const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 		glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
 
-		screen.w = mode->width;
-		screen.h = mode->height;
+        int fbw, fbh;
+        glfwGetFramebufferSize(window, &fbw, &fbh);
+        framebuffer_size_callback(window, fbw, fbh);
+        glm::vec2 c = focusBox.GetCenter();
+        glm::vec2 half = focusBox.GetSize();
+        const float padpx = 1.0f;
+        c.x = glm::clamp(c.x, half.x + padpx, (float)screen.w - half.x - padpx);
+        c.y = glm::clamp(c.y, half.y + padpx, (float)screen.h - half.y - padpx);
+        focusBox.SetCenter(c);
+        
 
+    }
+    else if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == true){
+        keys.keyLock[GLFW_KEY_F] = true;
+        fullscreen = false;
 
-	}
-	else if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == true) {
-		screen.resetSize();
-		glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
-		fullscreen = !fullscreen;
-	}
+        // Torna a windowed e richiama il callback
+        screen.resetSize(); // tua funzione
+        glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
+        int fbw, fbh;
+        glfwGetFramebufferSize(window, &fbw, &fbh);
+        framebuffer_size_callback(window, fbw, fbh);
+        glm::vec2 c = focusBox.GetCenter();
+        glm::vec2 half = focusBox.GetSize();
+        const float padpx = 1.0f;
+        c.x = glm::clamp(c.x, half.x + padpx, (float)screen.w - half.x - padpx);
+        c.y = glm::clamp(c.y, half.y + padpx, (float)screen.h - half.y - padpx);
+        focusBox.SetCenter(c);
+    }
 
 	if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
 		keys.keyLock[GLFW_KEY_F] = false;
@@ -607,36 +678,29 @@ void processInput(GLFWwindow* window)
 	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_P]) {
 		keys.keyLock[GLFW_KEY_P] = true;
 
-		if (gameState == GameState::PLAYING) {
-			gameState = GameState::PAUSED;
-		}
-		else if (gameState == GameState::PAUSED) {
-			gameState = GameState::PLAYING;
-		}
-	}
-	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE) {
-		keys.keyLock[GLFW_KEY_P] = false;
-	}
+        if (gameState == GameState::PLAYING) {
+            gameState = GameState::PAUSED;
+        }
+        else if (gameState == GameState::PAUSED) {
+            gameState = GameState::PLAYING;
+
+        }
+    }
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE) {
+        keys.keyLock[GLFW_KEY_P] = false;
+    }
 
 
-	//Space key 
-	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-
-		//se sei in Playng
-		if (gameState == GameState::PLAYING && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-			//deve fare qualcosa
-		}
-	}
 
 	// Escape key to return to menu or exit
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-		if (gameState == GameState::PLAYING) {
-
-
-			endGame = true;
-
-			/*  std::cout << "\n--- FINE PARTITA ---\n";
-			  std::cout << "Inserisci il tuo nome: ";
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_ESCAPE]) {
+        keys.keyLock[GLFW_KEY_ESCAPE] = true;
+     
+        if (gameState == GameState::PLAYING) {
+                endGame = true;
+                
+              /*  std::cout << "\n--- FINE PARTITA ---\n";
+                std::cout << "Inserisci il tuo nome: ";
 
 			  std::string inputLine;
 
@@ -648,23 +712,28 @@ void processInput(GLFWwindow* window)
 
 			  std::cerr << "[DEBUG] Nome inserito: " << playerName << "\n";
 
-			  ScoreManager::SaveScore(playerName, score);
-			  std::cout << "Punteggio salvato!\n";*/
-			gameState = GameState::NAME_INPUT;
-
-		}
-		else if (gameState == GameState::SCORES || gameState == GameState::INFO) {
-			gameState = GameState::MENU;
-		}
-		if (gameState == GameState::MENU) {
-			ingredients.clear();
-			//active = nullptr;
-			endGame = false;
-			glfwSetWindowShouldClose(window, true);
+                ScoreManager::SaveScore(playerName, score);
+                std::cout << "Punteggio salvato!\n";*/
+                gameState = GameState::NAME_INPUT;
+            
+        }
+        else if (gameState == GameState::SCORES || gameState == GameState::INFO || gameState==GameState::PAUSED) {
+           
+            gameState = GameState::MENU;            
+        }
+        else if(gameState == GameState::MENU ) {
+            ingredients.clear();
+            //active = nullptr;
+            endGame = false;
+            glfwSetWindowShouldClose(window, true);
 		}
 	}
+ 
 
-
+    // Rilascio ESC: sblocca il keyLock
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_RELEASE) {
+        keys.keyLock[GLFW_KEY_ESCAPE] = false;
+    }
 
 }
 
