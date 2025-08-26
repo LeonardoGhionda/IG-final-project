@@ -92,21 +92,21 @@ bool customWindowShouldClose(GLFWwindow* window) {
 
 void SpawnRandomIngredient() {
     std::vector<std::string> allIngredients = {
-           "resources/ball/ball.obj",
-        "resources/ingredients/pumpkin/pumpkin.obj",
-        "resources/ingredients/tomato/tomato.obj",
-        "resources/ingredients/butter/butter.obj",
-         "resources/ingredients/chocolate/chocolate.obj",
-         "resources/ingredients/flour/flour.obj",
-         "resources/ingredients/eggs/eggs.obj",
-         "resources/ingredients/honey/honey.obj",
-         "resources/ingredients/lemon/lemon.obj",
-         "resources/ingredients/milk/milk.obj",
-         "resources/ingredients/jam/jam.obj",
-         "resources/ingredients/vanilla/vanilla.obj",
-         "resources/ingredients/apple/apple.obj",
-         "resources/ingredients/strawberry/strawberry.obj"
-        // altri ingredienti qui
+				"resources/ball/ball.obj",
+				"resources/ingredients/pumpkin/pumpkin.obj",
+				"resources/ingredients/tomato/tomato.obj",
+				"resources/ingredients/butter/butter.obj",
+				"resources/ingredients/chocolate/chocolate.obj",
+				"resources/ingredients/flour/flour.obj",
+				"resources/ingredients/eggs/eggs.obj",
+				"resources/ingredients/honey/honey.obj",
+				"resources/ingredients/lemon/lemon.obj",
+				"resources/ingredients/milk/milk.obj",
+				"resources/ingredients/jam/jam.obj",
+				"resources/ingredients/vanilla/vanilla.obj",
+				"resources/ingredients/apple/apple.obj",
+				"resources/ingredients/strawberry/strawberry.obj"
+				// altri ingredienti qui
     };
    
     int index = rand() % allIngredients.size();
@@ -274,9 +274,12 @@ int main()
 	//glCullFace(GL_BACK); // Cull back faces
 	//glFrontFace(GL_CCW); // Front faces are counter-clockwise by default
 
+	std::cout << focusBox.GetCenter() << std::endl;
+
 	// render loop
 	// -----------
 	while (!customWindowShouldClose(window)) {
+
 		float currentFrame = static_cast<float>(glfwGetTime());
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
@@ -309,15 +312,6 @@ int main()
                 gameState = GameState::PLAYING;
                 glEnable(GL_DEPTH_TEST);
                 continue;
-				/*
-				//inserisco 4 ingredienti
-				for (int i = 0; i < 4; ++i)
-					ingredients.push_back(Ingredient("resources/ball/ball.obj", Ingredient::RandomSpawnPoint()));
-				active = &ingredients[0];
-				active->AddVelocity(active->getDirectionToCenter() * 5.0f);
-				active->updateTime();
-			   */
-
 			}
 			if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && scoresButton.isClicked(mousePos)) {
 				std::cout << "Scores clicked\n";
@@ -439,7 +433,7 @@ int main()
 			//move focus box
 			// Movimento della focus box
 			glm::vec2 moveDelta(0.0f);
-			float speed = 0.4f;
+			float speed = 0.2f;
 			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveDelta.x -= speed * deltaTime;
 			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDelta.x += speed * deltaTime;
 			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDelta.y += speed * deltaTime;
@@ -466,8 +460,6 @@ int main()
 					}
 				}
 			}
-
-
         }
         else if (gameState == GameState::SCORES) {
 
@@ -584,13 +576,6 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
 {
 
     float currentSpeed = focusSpeed * deltaTime;
-    /*
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS && glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL)
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	*/
 
     //Space key 
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
@@ -615,20 +600,6 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
         if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) focusBox.Move({ -s, 0.0f });
         if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) focusBox.Move({ s, 0.0f });
     }
-    //Camera movement
-    /*
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.Position += glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.Position -= glm::vec3(0.0f, 1.0f, 0.0f) * deltaTime * 5.0f;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.Position -= glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.Position += glm::normalize(glm::cross(camera.Front, camera.Up)) * deltaTime * 5.0f;
-   
-    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    */
   
     //fullscreen
     if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen==false)
@@ -816,4 +787,5 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
+
 }

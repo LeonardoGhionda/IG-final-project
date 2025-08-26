@@ -63,16 +63,16 @@ void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {
     glm::mat4 projection = glm::ortho(0.0f, (float)screenWidth, 0.0f, (float)screenHeight);
 
     // Unica TRASLAZIONE in pixel (niente * screen.w/h)
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(center, 0.0f));
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(center * glm::vec2(screenWidth, screenHeight), 0.0f));
 
     
     model = glm::scale(model, glm::vec3(getScaledSize(), 1.0f));
 
     shader.setMat4("projection", projection);
     shader.setMat4("model", model);
-    shader.setVec3("diffuseColor", glm::vec3(0.0f, 0.0f, 1.0f));
+    shader.setVec3("diffuseColor", glm::vec3(0.0f, 0.0f, 0.0f));
 
-    glLineWidth(5.0f);
+    glLineWidth(1.0f);
     glBindVertexArray(VAO);
     glDrawArrays(GL_LINE_LOOP, 0, 4);
     glBindVertexArray(0);
