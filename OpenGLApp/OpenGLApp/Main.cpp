@@ -217,13 +217,40 @@ void processSlash(const std::vector<glm::vec2>& trail, const glm::mat4& projecti
                 }
             }
 			// Gestione punteggio e vite
-            const bool inFocus = focusBox.Contains(objPos);
+            // --- calcolo "inFocus" in 0..1 come nel pass blur ---
+            glm::vec2 rectSize01 = focusBox.getScaledSize() * 2.0f;
+            rectSize01.x /= screen.w;
+            rectSize01.y /= screen.h;
+
+            glm::vec2 rectCenter01 = focusBox.GetCenter(); // già 0..1
+            float rectMinX = rectCenter01.x - rectSize01.x * 0.5f;
+            float rectMaxX = rectCenter01.x + rectSize01.x * 0.5f;
+
+            // nel pass blur inverti Y (1 - y); qui facciamo lo stesso
+            float rectCenterY01 = 1.0f - rectCenter01.y;
+            float rectMinY = rectCenterY01 - rectSize01.y * 0.5f;
+            float rectMaxY = rectCenterY01 + rectSize01.y * 0.5f;
+
+            // clampa nei bordi (opzionale, come fai nel render)
+            rectMinX = glm::max(0.0f, rectMinX);
+            rectMinY = glm::max(0.0f, rectMinY);
+            rectMaxX = glm::min(1.0f, rectMaxX);
+            rectMaxY = glm::min(1.0f, rectMaxY);
+
+            // posizione oggetto da pixel -> 0..1 (e Y invertita come sopra)
+            float objX01 = objPos.x / (float)screen.w;
+            float objY01 = 1.0f - (objPos.y / (float)screen.h);
+
+            bool inFocus =
+                (objX01 >= rectMinX && objX01 <= rectMaxX) &&
+                (objY01 >= rectMinY && objY01 <= rectMaxY);
+
+            // --- punteggio / vite ---
             if (it->IsBomb()) {
-                // bomba → sempre penalizza vite, ovunque si trovi
+                // bomba: vita -1 ovunque
                 lives = std::max(0, lives - 1);
             }
             else {
-                // ingrediente normale
                 if (inFocus) {
                     score += 1;
                 }
