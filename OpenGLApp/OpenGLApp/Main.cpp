@@ -93,7 +93,6 @@ bool customWindowShouldClose(GLFWwindow* window) {
 
 void SpawnRandomIngredient() {
     std::vector<std::string> allIngredients = {
-        "resources/ball/ball.obj",
         "resources/ingredients/pumpkin/pumpkin.obj",
         "resources/ingredients/tomato/tomato.obj",
         "resources/ingredients/butter/butter.obj",
@@ -227,7 +226,7 @@ int main()
     Model playButtonModel("resources/buttons/playButton.obj");
     Model scoresButtonModel("resources/buttons/scoresButton.obj");
     Model infoButtonModel("resources/buttons/infoButton.obj");
-    Model lifeIcon("resources/background/life/life.obj");
+    Model lifeIcon("resources/ball/ball.obj");
 
     glm::vec2 baseSize = glm::vec2(100.0f, 50.0f);
     float spacing = 100.0f;
@@ -356,21 +355,14 @@ int main()
 
         }
         else if (gameState == GameState::PLAYING) {
-            ourShader.use();
-            glEnable(GL_DEPTH_TEST);
-
-            glm::mat4 uiProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-            ourShader.setMat4("projection", uiProj);
-            ourShader.setMat4("view", glm::mat4(1.0f));
-            ourShader.setBool("hasTexture", false); // se la X non ha texture
-
           
                 spawnTimer += deltaTime;
                 if (spawnTimer >= spawnInterval) {
                     SpawnRandomIngredient();
                     spawnTimer = 0.0f;
                 }
-
+                glEnable(GL_DEPTH_TEST);
+                ourShader.use();
 
                 glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
                 glm::mat4 view = camera.GetViewMatrix();
@@ -388,19 +380,18 @@ int main()
 
                 glDisable(GL_DEPTH_TEST);
                 // --- UI pass: vite in alto a sinistra, senza depth test ---
-                ourShader.use(); 
-                glm::mat4 uiProj2 = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-                ourShader.setMat4("projection", uiProj2);
+                ourShader.use();
+                glm::mat4 uiProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+                ourShader.setMat4("projection", uiProj);
                 ourShader.setMat4("view", glm::mat4(1.0f));
+                ourShader.setBool("hasTexture", true);         
+                ourShader.setVec3("diffuseColor", glm::vec3(1)); // colore fallback
 
-                // se l'icona NON ha texture metti false; se ha una texture vera, true
-                ourShader.setBool("hasTexture", false);
-                ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
 
-                const float padX = 20.0f;
-                const float padY = 20.0f;
+                const float padX = 40.0f;
+                const float padY = 40.0f;
                 const float iconSize = 28.0f;
-                const float step = 12.0f;
+                const float step = 30.0f;
 
                 for (int i = 0; i < lives; ++i) {
                     float x = padX + i * (iconSize + step);
@@ -410,11 +401,11 @@ int main()
                     m = glm::translate(m, glm::vec3(x, y, 0.0f));
                     // Se il modello è centrato sull'origine, nessun offset extra:
                     m = glm::scale(m, glm::vec3(iconSize, iconSize, 1.0f));
+                    
 
                     ourShader.setMat4("model", m);
                     lifeIcon.Draw(ourShader);
                 }
-
 
                 // Mostra punteggio
                 textShader.use();
@@ -438,7 +429,7 @@ int main()
                 focusShader.use();
                 glLineWidth(2.0f);
                 focusBox.Draw(focusShader, screen.w, screen.h);
-                glEnable(GL_DEPTH_TEST);
+
                 //click oggetti
                 if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
                     for (auto it = ingredients.begin(); it != ingredients.end(); /* ++it gestito dentro */) {
@@ -450,9 +441,9 @@ int main()
                         }
 
                         const bool inFocus = focusBox.Contains(mousePos);
-
+                        const bool isBomb = it->IsBomb();
                         if (inFocus) {
-                            if (it->IsBomb()) {
+                            if (isBomb) {
                                 lives = std::max(0, lives - 1);
                                 score = std::max(0, score - 5);
                             }
@@ -477,7 +468,7 @@ int main()
                         break;
                     }
                 }
-
+                glEnable(GL_DEPTH_TEST);
 
             
         }
