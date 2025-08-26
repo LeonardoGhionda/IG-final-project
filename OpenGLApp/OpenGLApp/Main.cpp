@@ -53,7 +53,8 @@ bool endGame = false;
 int score = 0;
 std::string inputName = "";
 bool isTypingName = false;
-
+//vite
+int lives = 3;
 //fullscreen
 bool fullscreen = false;
 bool Esc = false;
@@ -92,7 +93,7 @@ bool customWindowShouldClose(GLFWwindow* window) {
 
 void SpawnRandomIngredient() {
     std::vector<std::string> allIngredients = {
-           "resources/ball/ball.obj",
+        "resources/ball/ball.obj",
         "resources/ingredients/pumpkin/pumpkin.obj",
         "resources/ingredients/tomato/tomato.obj",
         "resources/ingredients/butter/butter.obj",
@@ -105,30 +106,35 @@ void SpawnRandomIngredient() {
          "resources/ingredients/jam/jam.obj",
          "resources/ingredients/vanilla/vanilla.obj",
          "resources/ingredients/apple/apple.obj",
-         "resources/ingredients/strawberry/strawberry.obj"
+         "resources/ingredients/strawberry/strawberry.obj",
+       
         // altri ingredienti qui
     };
    
     int index = rand() % allIngredients.size();
     glm::vec2 spawn = Ingredient::RandomSpawnPoint();
 
-    Ingredient newIngredient(allIngredients[index].c_str(), spawn, 0.3f);
+    bool spawnBomb = (rand() % 100) < 20; // 20% bomba
+    std::string path = spawnBomb
+        ? "resources/ingredients/bomb/bomb.obj"      
+        : allIngredients[rand() % allIngredients.size()];
 
-
+    // traiettoria stile Fruit Ninja (come già fai)
     // Direzione verso l'alto e centro, con piccola deviazione casuale
     glm::vec2 target(0.0f, screen.screenlimit.y * 0.5f);
     glm::vec2 dir = glm::normalize(target - spawn);
-
     // Aggiungi una leggera deviazione casuale sull'asse X
     float angleOffset = ((rand() % 40) - 20) * 0.01745f; // ±20°
     dir = RotateVec2(dir, angleOffset);
-
     // Velocità in stile Fruit Ninja (8-12)
     float speed = 8.0f + static_cast<float>(rand() % 40) / 4.0f;
 
-    newIngredient.SetVelocity(dir * speed);
-    newIngredient.updateTime();
-    ingredients.push_back(newIngredient);
+    Ingredient item(path.c_str(), spawn, 0.3f, spawnBomb);
+    item.SetVelocity(dir * speed);
+    item.updateTime();
+    ingredients.push_back(item);
+
+
 }
 
 void character_callback(GLFWwindow* window, unsigned int codepoint) {
@@ -221,6 +227,7 @@ int main()
     Model playButtonModel("resources/buttons/playButton.obj");
     Model scoresButtonModel("resources/buttons/scoresButton.obj");
     Model infoButtonModel("resources/buttons/infoButton.obj");
+    Model lifeIcon("resources/background/life/life.obj");
 
     glm::vec2 baseSize = glm::vec2(100.0f, 50.0f);
     float spacing = 100.0f;
@@ -323,7 +330,8 @@ int main()
                 ingredients.clear();
                 score = 0;
 				spawnTimer = 0.0f; // Reset timer
-                gameState = GameState::PLAYING;
+                lives = 3;
+                gameState = GameState::PLAYING;         
                 glEnable(GL_DEPTH_TEST);
                 continue;
 				/*
@@ -348,72 +356,132 @@ int main()
 
         }
         else if (gameState == GameState::PLAYING) {
+            ourShader.use();
             glEnable(GL_DEPTH_TEST);
 
-            spawnTimer += deltaTime;
-            if (spawnTimer >= spawnInterval) {
-                SpawnRandomIngredient();
-                spawnTimer = 0.0f;
-            }
-            
+            glm::mat4 uiProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+            ourShader.setMat4("projection", uiProj);
+            ourShader.setMat4("view", glm::mat4(1.0f));
+            ourShader.setBool("hasTexture", false); // se la X non ha texture
 
-            glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-            glm::mat4 view = camera.GetViewMatrix();
-           
-            ourShader.setMat4("projection", perspectiveProj);
-            ourShader.setMat4("view", view);
+          
+                spawnTimer += deltaTime;
+                if (spawnTimer >= spawnInterval) {
+                    SpawnRandomIngredient();
+                    spawnTimer = 0.0f;
+                }
 
-            for (auto& ing : ingredients) {
-                ing.Move();
-                ourShader.setMat4("model", ing.GetModelMatrix());
-                ourShader.setBool("hasTexture", true);
+
+                glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+                glm::mat4 view = camera.GetViewMatrix();
+
+                ourShader.setMat4("projection", perspectiveProj);
+                ourShader.setMat4("view", view);
+
+                for (auto& ing : ingredients) {
+                    ing.Move();
+                    ourShader.setMat4("model", ing.GetModelMatrix());
+                    ourShader.setBool("hasTexture", true);
+                    ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+                    ing.Draw(ourShader);
+                }
+
+                glDisable(GL_DEPTH_TEST);
+                // --- UI pass: vite in alto a sinistra, senza depth test ---
+                ourShader.use(); 
+                glm::mat4 uiProj2 = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+                ourShader.setMat4("projection", uiProj2);
+                ourShader.setMat4("view", glm::mat4(1.0f));
+
+                // se l'icona NON ha texture metti false; se ha una texture vera, true
+                ourShader.setBool("hasTexture", false);
                 ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-                ing.Draw(ourShader);
-            }
 
-            glDisable(GL_DEPTH_TEST);
-            // Mostra punteggio
-            textShader.use();
-            glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
-            textShader.setMat4("projection", projection);
-            std::string scoreText = "Score: " + std::to_string(score);
-            textRenderer.DrawText(textShader, scoreText, screen.w - 200.0f,
-                screen.h - 50.0f, 1.0f, glm::vec3(1.0f));
+                const float padX = 20.0f;
+                const float padY = 20.0f;
+                const float iconSize = 28.0f;
+                const float step = 12.0f;
 
-            //  focus box
-        	
-            glm::vec2 c = focusBox.GetCenter();
-            glm::vec2 half = focusBox.GetSize();
-            const float pad = 1.0f;                   // 1px di margine
-            c.x = glm::clamp(c.x, half.x + pad, (float)screen.w - half.x - pad);
-            c.y = glm::clamp(c.y, half.y + pad, (float)screen.h - half.y - pad);
-            focusBox.SetCenter(c);
+                for (int i = 0; i < lives; ++i) {
+                    float x = padX + i * (iconSize + step);
+                    float y = screen.h - padY;
 
-            focusShader.use();
-            glLineWidth(2.0f);
-            focusBox.Draw(focusShader, screen.w, screen.h);
-            glEnable(GL_DEPTH_TEST);
-            //click oggetti
-            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
-                for (auto it = ingredients.begin(); it != ingredients.end();) {
-                    if (it->hit(mousePos, perspectiveProj, view)) {
-                        if (focusBox.Contains(mousePos)) {
-                            score++;
+                    glm::mat4 m(1.0f);
+                    m = glm::translate(m, glm::vec3(x, y, 0.0f));
+                    // Se il modello è centrato sull'origine, nessun offset extra:
+                    m = glm::scale(m, glm::vec3(iconSize, iconSize, 1.0f));
+
+                    ourShader.setMat4("model", m);
+                    lifeIcon.Draw(ourShader);
+                }
+
+
+                // Mostra punteggio
+                textShader.use();
+                glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+                textShader.setMat4("projection", projection);
+                std::string scoreText = "Score: " + std::to_string(score);
+                textRenderer.DrawText(textShader, scoreText, screen.w - 200.0f,
+                    screen.h - 50.0f, 1.0f, glm::vec3(1.0f));
+
+               
+
+                //  focus box
+
+                glm::vec2 c = focusBox.GetCenter();
+                glm::vec2 half = focusBox.GetSize();
+                const float pad = 1.0f;                   // 1px di margine
+                c.x = glm::clamp(c.x, half.x + pad, (float)screen.w - half.x - pad);
+                c.y = glm::clamp(c.y, half.y + pad, (float)screen.h - half.y - pad);
+                focusBox.SetCenter(c);
+
+                focusShader.use();
+                glLineWidth(2.0f);
+                focusBox.Draw(focusShader, screen.w, screen.h);
+                glEnable(GL_DEPTH_TEST);
+                //click oggetti
+                if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
+                    for (auto it = ingredients.begin(); it != ingredients.end(); /* ++it gestito dentro */) {
+
+                        // Procedi solo se questo ingrediente è stato effettivamente cliccato
+                        if (!it->hit(mousePos, perspectiveProj, view)) {
+                            ++it;
+                            continue;
+                        }
+
+                        const bool inFocus = focusBox.Contains(mousePos);
+
+                        if (inFocus) {
+                            if (it->IsBomb()) {
+                                lives = std::max(0, lives - 1);
+                                score = std::max(0, score - 5);
+                            }
+                            else {
+                                score += 1;
+                            }
                         }
                         else {
+                            // Fuori dal quadrante: perdi 1 punto
                             score = std::max(0, score - 1);
                         }
-                        it = ingredients.erase(it);
-                    }
 
-                    else {
-                        ++it;
+                        // In tutti i casi l’oggetto cliccato viene eliminato
+                        it = ingredients.erase(it);
+
+                        // Controllo fine partita
+                        if (lives == 0) {
+                            gameState = GameState::NAME_INPUT; // oppure END
+                        }
+
+                        // Abbiamo gestito il click per un ingrediente: esci dal loop
+                        break;
                     }
                 }
-            }
 
 
+            
         }
+
         else if (gameState == GameState::SCORES) {
 
             ScoreManager manager;

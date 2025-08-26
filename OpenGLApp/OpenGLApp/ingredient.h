@@ -12,7 +12,7 @@
 class Ingredient {
 
 public:
-    Ingredient(const char* path, glm::vec2 spawnpoint,float scale=1.0f) : model(path), mat(1.0f), scaleFactor(scale) {
+    Ingredient(const char* path, glm::vec2 spawnpoint,float scale=1.0f, bool isBomb = false) : model(path), mat(1.0f), scaleFactor(scale), isBomb_(isBomb) {
         
       
         mat = glm::translate(mat, glm::vec3(spawnpoint, 0.0f));
@@ -123,6 +123,9 @@ public:
         time = static_cast<float>(glfwGetTime());
     }
 
+
+    bool IsBomb() const { return isBomb_; }
+
 private:
     float scaleFactor;
     Model model;
@@ -135,7 +138,7 @@ private:
     glm::vec2 velocity;
     glm::vec2 spawnpoint;
     glm::vec2 directionToCenter; //direction towards the center of the screen shifted by a small random angle
-
+    bool isBomb_ = false;
 
     //circular hitbox in mouse coord system
     float CHB_MCS(glm::mat4 projection, glm::mat4 view) {
