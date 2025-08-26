@@ -36,7 +36,7 @@ Screen screen = Screen::S16_9();
 // camera
 Camera camera(CAMERA_POS);
 
-float focusSpeed = 400.0f; // puoi metterlo come variabile globale
+float focusSpeed = 0.3f; // puoi metterlo come variabile globale
 
 // timing
 float deltaTime = 0.0f;
