@@ -493,6 +493,8 @@ int main()
                     }
                 }
                 else {
+                    
+                    
                     if (isDragging) {
                         isDragging = false;
                         if (!mouseTrail.empty() && camera.Zoom != 0.0f){
@@ -567,11 +569,12 @@ int main()
                 glLineWidth(2.0f);
                 focusBox.Draw(focusShader, screen.w, screen.h);
                 if (isDragging && mouseTrail.size() >= 2) {
+                    // 1. Disegna la scia del mouse
                     trailShader->use();
 
                     glm::mat4 proj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
                     trailShader->setMat4("projection", proj);
-                    trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f)); // rosso
+                    trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f)); // giallo
 
                     std::vector<float> trailData;
                     for (const auto& pt : mouseTrail) {
@@ -585,7 +588,12 @@ int main()
                     glBindVertexArray(trailVAO);
                     glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mouseTrail.size());
                     glBindVertexArray(0);
+
+                    // 2. Processa il taglio sugli ingredienti
+                    processSlash(mouseTrail, perspectiveProj, view, focusBox);
+
                 }
+
 
                 // Disegna gli effetti di taglio (scia temporanea)
                 double now = glfwGetTime();
@@ -1014,11 +1022,13 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
         camera.ProcessMouseMovement(xoffset, yoffset);
     
     if (isDragging) {
-        mouseTrail.push_back(mousePos);  // usa coordinate ortho!
-        if (mouseTrail.size() > 20)
-            mouseTrail.erase(mouseTrail.begin());
+        if (mouseTrail.empty() || glm::distance(mouseTrail.back(), mousePos) > 3.0f) {
+            mouseTrail.push_back(mousePos);
+            if (mouseTrail.size() > 25)
+                mouseTrail.erase(mouseTrail.begin());
+        }
     }
-    
+
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
