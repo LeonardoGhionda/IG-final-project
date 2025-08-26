@@ -180,6 +180,8 @@
     <None Include="shader.vs">
       <FileType>Document</FileType>
     </None>
+    <None Include="shader_blur.fs" />
+    <None Include="shader_blur_objs.fs" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="score.txt" />

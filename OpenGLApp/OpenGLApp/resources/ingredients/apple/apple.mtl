@@ -1,22 +1,13 @@
-# Blender 4.1.1 MTL File: 'None'
+# Blender 4.1.1 MTL File: 'apple.blend'
 # www.blender.org
 
-newmtl app_rough
-Ns 0.000000
+newmtl red_apple_1_texture.001
 Ka 1.000000 1.000000 1.000000
-Kd 0.800000 0.800000 0.800000
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
-illum 3
-
-newmtl app_shine
-Ns 0.000000
-Ka 1.000000 1.000000 1.000000
-Kd 0.800000 0.800000 0.800000
-Ks 0.500000 0.500000 0.500000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-d 1.000000
-illum 3
+illum 2
+map_Kd apple_red_1_Diffuse.jpg
+map_Ns apple_red_1_Roughness.jpg
+map_Bump -bm 1.000000 apple_red_1_Normal.jpg

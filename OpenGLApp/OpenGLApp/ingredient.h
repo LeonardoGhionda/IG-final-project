@@ -136,9 +136,12 @@ public:
         time = static_cast<float>(glfwGetTime());
     }
 
-
-    bool IsBomb() const { return isBomb_; }
-
+    Texture* getFirstTexture() {
+        if (model.textures_loaded.size() > 0)
+            return &model.textures_loaded[0];
+        return nullptr;
+    }
+  bool IsBomb() const { return isBomb_; }
 private:
     float scaleFactor;
     Model model;
