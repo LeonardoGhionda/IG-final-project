@@ -547,6 +547,9 @@ int main()
                 }
                 glEnable(GL_DEPTH_TEST);
                 ourShader.use();
+                ourShader.setVec3("diffuseColor", glm::vec3(1.0f));  // colore fallback bianco
+                ourShader.setBool("hasTexture", true);              // o false se vuoi colore puro
+
 
                 glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
                 glm::mat4 view = camera.GetViewMatrix();
@@ -620,6 +623,13 @@ int main()
                     ourShader.setMat4("model", m);
                     lifeIcon.Draw(ourShader);
                 }
+                // Disegna lo score in alto a destra
+                textShader.use();
+                textShader.setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
+
+                std::string scoreText = "Score: " + std::to_string(score);
+                textRenderer.DrawText(textShader, scoreText, screen.w - 250.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
+
 
 if (isDragging && mouseTrail.size() >= 2) {
                     // 1. Disegna la scia del mouse
