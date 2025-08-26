@@ -80,7 +80,7 @@ std::vector<glm::vec2> mouseTrail;
 bool isDragging = false;
 
 
-GameState gameState = GameState::PLAYING;
+GameState gameState = GameState::MENU;
 std::deque<Ingredient> ingredients;
 std::string playerName = "Player1"; // Default player name, can be changed later
 //Ingredient* active = nullptr;
@@ -288,10 +288,27 @@ int main()
 
 		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		ourShader.use();
 
 	
 		if (gameState == GameState::MENU) {
+
+			ourShader.use();
+			////////////////////////
+			glDisable(GL_DEPTH_TEST);
+
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+
+			// Background
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			ourShader.setMat4("model", model);
+			ourShader.setBool("hasTexture", true);  // background ha texture
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
+			backgroundPlane.Draw(ourShader);
+			/////////////////////
 
 			// Play button (senza texture, colore da MTL o fisso)
 			ourShader.setBool("hasTexture", false);
