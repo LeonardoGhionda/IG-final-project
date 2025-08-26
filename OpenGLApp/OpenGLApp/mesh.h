@@ -43,6 +43,8 @@ struct Texture {
     unsigned int id = 0;
     string type;
     string path;
+    ///////////
+    int h, w;
 };
 
 class Mesh {

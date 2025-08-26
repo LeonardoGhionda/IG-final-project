@@ -390,7 +390,6 @@ int main()
 				// Aggiorna e disegna tutti gli ingredienti
 				objBlurShader.use();
 
-				objBlurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
 				objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
 				
 				objBlurShader.setMat4("projection", perspectiveProj);
@@ -400,6 +399,13 @@ int main()
 
 				for (auto& ing : ingredients) {
 					ing.Move();
+					//texure height and width foer uTextelSize
+					Texture* t = ing.getFirstTexture();
+					if (t != nullptr) {
+						int tW = t->w;
+						int tH = t->h;
+						objBlurShader.setVec2("uTexelSize", glm::vec2(1.0f / tW, 1.0f / tH));
+					}
 					objBlurShader.setMat4("model", ing.GetModelMatrix());
 					objBlurShader.setBool("hasTexture", true);
 					objBlurShader.setVec3("diffuseColor", glm::vec3(1.0f));

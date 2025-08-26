@@ -19,9 +19,15 @@
 #include <iostream>
 #include <map>
 #include <vector>
+
 using namespace std;
 
-unsigned int TextureFromFile(const char* path, const string& directory, bool gamma = false);
+typedef struct {
+    unsigned int id;
+    int w, h;
+} TextureInfo;
+
+TextureInfo TextureFromFile(const char* path, const string& directory, bool gamma = false);
 
 class Model
 {
@@ -205,7 +211,10 @@ private:
             if (!skip)
             {   // if texture hasn't been loaded already, load it
                 Texture texture;
-                texture.id = TextureFromFile(str.C_Str(), this->directory);
+                TextureInfo ti = TextureFromFile(str.C_Str(), this->directory);
+                texture.id = ti.id;
+                texture.w = ti.w;
+                texture.h = ti.h;
                 texture.type = typeName;
                 texture.path = str.C_Str();
                 textures.push_back(texture);
@@ -216,17 +225,21 @@ private:
     }
 };
 
-unsigned int TextureFromFile(const char* path, const string& directory, bool gamma)
+TextureInfo TextureFromFile(const char* path, const string& directory, bool gamma)
 {
     string filename = string(path);
     filename = directory + '/' + filename;
-    std::cout << "Texture  path: " << filename << std::endl;
     unsigned int textureID;
     glGenTextures(1, &textureID);
+    TextureInfo ti{textureID, 0, 0};
 
     int width, height, nrComponents;
     
     unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
+
+    ti.w = width;
+    ti.h = height;
+
     if (data)
     {
         GLenum format = GL_RED;
@@ -254,6 +267,7 @@ unsigned int TextureFromFile(const char* path, const string& directory, bool gam
         stbi_image_free(data);
     }
 
-    return textureID;
+
+    return ti;
 }
 #endif

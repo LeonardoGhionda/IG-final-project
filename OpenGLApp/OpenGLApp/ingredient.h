@@ -123,6 +123,12 @@ public:
         time = static_cast<float>(glfwGetTime());
     }
 
+    Texture* getFirstTexture() {
+        if (model.textures_loaded.size() > 0)
+            return &model.textures_loaded[0];
+        return nullptr;
+    }
+
 private:
     float scaleFactor;
     Model model;
