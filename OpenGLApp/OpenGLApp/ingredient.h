@@ -74,7 +74,7 @@ public:
 
 
     //center position in world space 
-    glm::vec3 Position() {
+    glm::vec3 Position() const {
         glm::vec4 centerWorldSpace = mat * glm::vec4(center, 1.0f);
         return glm::vec3(centerWorldSpace);
     }
@@ -94,6 +94,19 @@ public:
         screenPos.y = (1.0f - (normalizedCS.y + 1.0f) * 0.5f) * screen.h + screen.paddingH;
         return screenPos;
     }
+
+    glm::vec2 MCSPositionOrtho(const glm::mat4& projection, const glm::mat4& view) const {
+        glm::vec4 clipSpace = projection * view * glm::vec4(Position(), 1.0f);
+        glm::vec3 ndc = glm::vec3(clipSpace) / clipSpace.w;
+
+        // Coordinate in pixel (da -1..1 a 0..screen.w/h)
+        glm::vec2 screenPos;
+        screenPos.x = (ndc.x * 0.5f + 0.5f) * screen.w; 
+        screenPos.y = (ndc.y * 0.5f + 0.5f) * screen.h;
+
+        return screenPos;
+    }
+
 
     bool hit(glm::vec2 mousePos, glm::mat4 projection, glm::mat4 view) {
         glm::vec2 pos = MCSPosition(projection, view);
