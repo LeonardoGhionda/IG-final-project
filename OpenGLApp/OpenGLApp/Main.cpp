@@ -32,7 +32,7 @@ float lastX = screen.w / 2.0f;
 float lastY = screen.h / 2.0f;
 bool firstMouse = true;
 Screen screen = Screen::S16_9();
-
+//ciao
 // camera
 Camera camera(CAMERA_POS);
 
