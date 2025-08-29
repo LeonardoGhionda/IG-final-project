@@ -375,7 +375,7 @@ int main()
 	Model playButtonModel("resources/buttons/playButton.obj");
 	Model scoresButtonModel("resources/buttons/scoresButton.obj");
 	Model infoButtonModel("resources/buttons/infoButton.obj");
-   Model lifeIcon("resources/ball/ball.obj");
+    Model lifeIcon("resources/ingredients/heart/heart.obj");
 
 	glm::vec2 baseSize = glm::vec2(100.0f, 50.0f);
 	float spacing = 100.0f;
@@ -632,10 +632,10 @@ int main()
                 ourShader.setVec3("diffuseColor", glm::vec3(1)); // colore fallback
 
 
-                const float padX = 40.0f;
-                const float padY = 40.0f;
+                const float padX = 60.0f;
+                const float padY = 60.0f;
                 const float iconSize = 28.0f;
-                const float step = 30.0f;
+                const float step = 80.0f;
 
                 for (int i = 0; i < lives; ++i) {
                     float x = padX + i * (iconSize + step);

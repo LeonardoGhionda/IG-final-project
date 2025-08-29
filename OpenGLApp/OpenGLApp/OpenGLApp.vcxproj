@@ -124,8 +124,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\irrKlang-64bit-1.6.0\lib\Winx64-visualStudio;..\..\glfw-3.3.8.bin.WIN64\lib-vc2022;..\..\Assimp\lib\x64;%(AdditionalLibraryDirectories);C:\Users\asche\vcpkg\installed\x64-windows\lib;C:\Users\leona\vcpkg\installed\x64-windows\lib;C:\Users\linaa\vcpkg\installed\x64-windows\lib;..\..\OpenGLApp\OpenGLApp\external\freetype-2.13.3\builds\Release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;assimp-vc143-mt.lib;irrKlang.lib;freetype.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\irrKlang-64bit-1.6.0\lib\Winx64-visualStudio;..\..\glfw-3.3.8.bin.WIN64\lib-vc2022;..\..\Assimp\lib\x64;%(AdditionalLibraryDirectories);C:\Users\asche\vcpkg\installed\x64-windows\lib;C:\Users\leona\vcpkg\installed\x64-windows\lib;C:\Users\linaa\vcpkg\installed\x64-windows\lib;..\..\OpenGLApp\OpenGLApp\external\freetype-2.13.3\builds\Release;C:\Users\asche\Libraries\freetype\freetype-windows-binaries-master\release static\vs2015-2022\win64\freetype.lib;C:\Users\asche\vcpkg\installed\x64-windows\debug\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;assimp-vc143-mt.lib;irrKlang.lib;freetype.lib;harfbuzz.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
