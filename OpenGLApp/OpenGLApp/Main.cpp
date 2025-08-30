@@ -414,34 +414,21 @@ int main()
 		"INFO"
 	};
 
-
 	// Per bitmap: g->bitmap.buffer
 	// Per contorni: g->outline
 
 	// 4. Da outline → mesh
 	// g->outline: contiene i contorni vettoriali della lettera
 	// draw in wireframe
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	glDisable(GL_CULL_FACE);
 	//glCullFace(GL_BACK); // Cull back faces
 	//glFrontFace(GL_CCW); // Front faces are counter-clockwise by default
 
-    /*debug*/ glm::vec2 lastFBC = glm::vec2(0.0f);
-
-
-
 	// render loop
 	// -----------
 	while (!customWindowShouldClose(window)) {
-
-        //debug
-        if (focusBox.GetCenter() != lastFBC) {
-            std::cout << focusBox.GetCenter() << std::endl;
-            lastFBC = focusBox.GetCenter();
-        }
-            
-
 
 		float currentFrame = static_cast<float>(glfwGetTime());
 		deltaTime = currentFrame - lastFrame;
@@ -567,16 +554,6 @@ int main()
 
 			if (!ingredients.empty()) {	
 
-				// Aggiorna e disegna tutti gli ingredienti
-				objBlurShader.use();
-
-				objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
-				
-				objBlurShader.setMat4("projection", perspectiveProj);
-				objBlurShader.setMat4("view", view);
-				objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
-				objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
-
 				spawnTimer += deltaTime;
                 if (spawnTimer >= spawnInterval) {
                     SpawnRandomIngredient();
@@ -612,8 +589,15 @@ int main()
                     }
                 }
 
-                ourShader.setMat4("projection", perspectiveProj);
-                ourShader.setMat4("view", view);
+				// Aggiorna e disegna tutti gli ingredienti
+				objBlurShader.use();
+
+				objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+
+				objBlurShader.setMat4("projection", perspectiveProj);
+				objBlurShader.setMat4("view", view);
+				objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
+				objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
 
 				for (auto& ing : ingredients) {
 					ing.Move();
@@ -881,19 +865,6 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
 		const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 		glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
 
-        /*
-        int fbw, fbh;
-        glfwGetFramebufferSize(window, &fbw, &fbh);
-        framebuffer_size_callback(window, fbw, fbh);
-        glm::vec2 c = focusBox.GetCenter();
-        glm::vec2 half = focusBox.GetSize();
-        const float padpx = 1.0f;
-        c.x = glm::clamp(c.x, half.x + padpx, (float)screen.w - half.x - padpx);
-        c.y = glm::clamp(c.y, half.y + padpx, (float)screen.h - half.y - padpx);
-        focusBox.SetCenter(c);
-        */
-        
-
     }
     else if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == true){
         keys.keyLock[GLFW_KEY_F] = true;
@@ -903,17 +874,6 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
         screen.resetSize(); // tua funzione
         glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
 
-        /*
-        int fbw, fbh;
-        glfwGetFramebufferSize(window, &fbw, &fbh);
-        framebuffer_size_callback(window, fbw, fbh);
-        glm::vec2 c = focusBox.GetCenter();
-        glm::vec2 half = focusBox.GetSize();
-        const float padpx = 1.0f;
-        c.x = glm::clamp(c.x, half.x + padpx, (float)screen.w - half.x - padpx);
-        c.y = glm::clamp(c.y, half.y + padpx, (float)screen.h - half.y - padpx);
-        focusBox.SetCenter(c);
-        */
     }
 
 	if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
