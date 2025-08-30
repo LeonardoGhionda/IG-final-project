@@ -427,11 +427,21 @@ int main()
 	//glCullFace(GL_BACK); // Cull back faces
 	//glFrontFace(GL_CCW); // Front faces are counter-clockwise by default
 
-	std::cout << focusBox.GetCenter() << std::endl;
+    /*debug*/ glm::vec2 lastFBC = glm::vec2(0.0f);
+
+
 
 	// render loop
 	// -----------
 	while (!customWindowShouldClose(window)) {
+
+        //debug
+        if (focusBox.GetCenter() != lastFBC) {
+            std::cout << focusBox.GetCenter() << std::endl;
+            lastFBC = focusBox.GetCenter();
+        }
+            
+
 
 		float currentFrame = static_cast<float>(glfwGetTime());
 		deltaTime = currentFrame - lastFrame;
@@ -658,7 +668,7 @@ int main()
                 textRenderer.DrawText(textShader, scoreText, screen.w - 250.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
 
 
-if (isDragging && mouseTrail.size() >= 2) {
+                if (isDragging && mouseTrail.size() >= 2) {
                     // 1. Disegna la scia del mouse
                     trailShader->use();
 
@@ -714,52 +724,8 @@ if (isDragging && mouseTrail.size() >= 2) {
                     glBindVertexArray(trailVAO);
                     glDrawArrays(GL_LINES, 0, (GLsizei)(cutData.size() / 2));
                     glBindVertexArray(0);
-                }
-
-
-
-                //click oggetti
-                /*
-                if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT)) {
-                    for (auto it = ingredients.begin(); it != ingredients.end(); ) {
-
-                        // Procedi solo se questo ingrediente è stato effettivamente cliccato
-                        if (!it->hit(mousePos, perspectiveProj, view)) {
-                            ++it;
-                            continue;
-                        }
-
-                        const bool inFocus = focusBox.Contains(mousePos);
-                        const bool isBomb = it->IsBomb();
-                        if (inFocus) {
-                            if (isBomb) {
-                                lives = std::max(0, lives - 1);
-                                score = std::max(0, score - 5);
-                            }
-                            else {
-                                score += 1;
-                            }
-                        }
-                        else {
-                            // Fuori dal quadrante: perdi 1 punto
-                            score = std::max(0, score - 1);
-                        }
-
-                        // In tutti i casi l’oggetto cliccato viene eliminato
-                        it = ingredients.erase(it);
-
-                        // Controllo fine partita
-                        if (lives == 0) {
-                            gameState = GameState::NAME_INPUT; // oppure END
-                        }
-
-                        // Abbiamo gestito il click per un ingrediente: esci dal loop
-                        break;
-                    } 
-                } */
+                }       
                 glEnable(GL_DEPTH_TEST);
-
-            
         }
 
         else if (gameState == GameState::SCORES) {
@@ -915,6 +881,7 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
 		const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 		glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
 
+        /*
         int fbw, fbh;
         glfwGetFramebufferSize(window, &fbw, &fbh);
         framebuffer_size_callback(window, fbw, fbh);
@@ -924,6 +891,7 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
         c.x = glm::clamp(c.x, half.x + padpx, (float)screen.w - half.x - padpx);
         c.y = glm::clamp(c.y, half.y + padpx, (float)screen.h - half.y - padpx);
         focusBox.SetCenter(c);
+        */
         
 
     }
@@ -934,6 +902,8 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
         // Torna a windowed e richiama il callback
         screen.resetSize(); // tua funzione
         glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
+
+        /*
         int fbw, fbh;
         glfwGetFramebufferSize(window, &fbw, &fbh);
         framebuffer_size_callback(window, fbw, fbh);
@@ -943,6 +913,7 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
         c.x = glm::clamp(c.x, half.x + padpx, (float)screen.w - half.x - padpx);
         c.y = glm::clamp(c.y, half.y + padpx, (float)screen.h - half.y - padpx);
         focusBox.SetCenter(c);
+        */
     }
 
 	if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
