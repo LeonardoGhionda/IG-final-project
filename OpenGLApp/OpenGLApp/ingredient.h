@@ -5,14 +5,13 @@
 #include "vecplus.h"
 #include "screen.h"
 
-//#define G glm::vec2(0.0f, -3.0f)
-#define G glm::vec2(0.0f, -6.0f)
-
+#define G glm::vec2(0.0f, -6.0f) //gravità
 
 class Ingredient {
 
 public:
-    Ingredient(const char* path, glm::vec2 spawnpoint,float scale=1.0f, bool isBomb = false) : model(path), mat(1.0f), scaleFactor(scale), isBomb_(isBomb) {
+
+    Ingredient(Model& model, glm::vec2 spawnpoint,float scale=1.0f, bool isBomb = false) : model(&model), mat(1.0f), scaleFactor(scale), isBomb_(isBomb) {
         
       
         mat = glm::translate(mat, glm::vec3(spawnpoint, 0.0f));
@@ -43,7 +42,7 @@ public:
     }
 
     void Draw(Shader shader) { 
-        model.Draw(shader); 
+        model->Draw(shader); 
     }
 
     glm::mat4 GetModelMatrix() const {
@@ -137,14 +136,14 @@ public:
     }
 
     Texture* getFirstTexture() {
-        if (model.textures_loaded.size() > 0)
-            return &model.textures_loaded[0];
+        if (model->textures_loaded.size() > 0)
+            return &model->textures_loaded[0];
         return nullptr;
     }
   bool IsBomb() const { return isBomb_; }
 private:
     float scaleFactor;
-    Model model;
+    Model* model;
     glm::mat4 mat;
     float time;
     float CHB;         //radius of a circular hitbox
