@@ -1,0 +1,72 @@
+# Blender 4.2.3 LTS MTL File: 'ricetta1.blend'
+# www.blender.org
+
+newmtl Material
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/pergamena.jpg
+
+newmtl Material.001
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.073965 0.012196 0.003998
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+
+newmtl Material.024
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/cioccolato.jpg
+
+newmtl Material.067
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/eggs.jpg
+
+newmtl Material.068
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/pumpkin.jpg
+
+newmtl Material.069
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/vanilla.jpg
+
+newmtl ricetta1
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+illum 2
+map_Kd textures/ricetta10.png
+map_d textures/ricetta10.png
