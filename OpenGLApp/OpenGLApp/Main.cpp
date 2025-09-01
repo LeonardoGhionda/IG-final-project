@@ -121,10 +121,14 @@ void SpawnRandomIngredient() {
          "resources/ingredients/vanilla/vanilla.obj",
          "resources/ingredients/apple/apple.obj",
          "resources/ingredients/strawberry/strawberry.obj",
+		 "resources/ingredients/lem_marcio/lim_marcio.obj",
+		 "resources/ingredients/apple_gold/mela_oro.obj",
+		  "resources/ingredients/choc_marcio/cioc_marcio.obj",
+		 "resources/ingredients/strawb_gold/fragola_oro.obj",
        
         // altri ingredienti qui
     };
-   
+
     int index = rand() % allIngredients.size();
     glm::vec2 spawn = Ingredient::RandomSpawnPoint();
 
@@ -135,17 +139,20 @@ void SpawnRandomIngredient() {
 
 
 	// Direzione verso l'alto e centro, con piccola deviazione casuale
-	glm::vec2 target(0.0f, screen.screenlimit.y * 0.5f);
+	glm::vec2 target(screen.w * 0.5f, screen.h * 0.7f); // centro alto
 	glm::vec2 dir = glm::normalize(target - spawn);
 
-	// Aggiungi una leggera deviazione casuale sull'asse X
-	float angleOffset = ((rand() % 40) - 20) * 0.01745f; // ±20°
+
+	// ±12° per ridurre lo sbandamento laterale
+	float angleOffset = ((rand() % 24) - 12) * 0.01745f;
 	dir = RotateVec2(dir, angleOffset);
 
-	// Velocità in stile Fruit Ninja (8-12)
-	float speed = 8.0f + static_cast<float>(rand() % 40) / 4.0f;
+	// spinta un po' più “verticale/arcata”
+	float speed = 600.0f + static_cast<float>(rand() % 100); // 600–699
 
-    Ingredient item(path.c_str(), spawn, 0.3f, spawnBomb);
+	float scale = 30.0f;
+
+    Ingredient item(path.c_str(), spawn, scale, spawnBomb);
     item.SetVelocity(dir * speed);
     item.updateTime();
     ingredients.push_back(item);
@@ -536,14 +543,16 @@ int main()
 			blurShader.setMat4("model", model);
 			blurShader.setBool("hasTexture", true);  // background ha texture
 			blurShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
-
 			backgroundPlane.Draw(blurShader);
-
 
 			// Ingredients
 			//---------------
+			glm::mat4 ingProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			glm::mat4 ingView(1.0f);
 			glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
 			glm::mat4 view = camera.GetViewMatrix();
+			model = glm::scale(model, glm::vec3(20.0f));  // per test visibilità
+
 			spawnTimer += deltaTime;
 			if (spawnTimer >= spawnInterval) {
 				SpawnRandomIngredient();
@@ -554,11 +563,7 @@ int main()
 
 			if (!ingredients.empty()) {	
 
-				spawnTimer += deltaTime;
-                if (spawnTimer >= spawnInterval) {
-                    SpawnRandomIngredient();
-                    spawnTimer = 0.0f;
-                }
+				
                 glEnable(GL_DEPTH_TEST);
                 ourShader.use();
                 ourShader.setVec3("diffuseColor", glm::vec3(1.0f));  // colore fallback bianco
@@ -582,7 +587,7 @@ int main()
                         isDragging = false;
                         if (!mouseTrail.empty() && camera.Zoom != 0.0f){
                             // Se c'è una scia, processala
-                            processSlash(mouseTrail, perspectiveProj, view,focusBox);
+							processSlash(mouseTrail, ingProj, ingView, focusBox);
 						}
 
                         mouseTrail.clear();
@@ -591,14 +596,13 @@ int main()
 
 				// Aggiorna e disegna tutti gli ingredienti
 				objBlurShader.use();
-
 				objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
-
-				objBlurShader.setMat4("projection", perspectiveProj);
-				objBlurShader.setMat4("view", view);
+				objBlurShader.setMat4("projection", ingProj);
+				objBlurShader.setMat4("view", ingView);
 				objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
 				objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
-
+				
+				glDisable(GL_DEPTH_TEST);
 				for (auto& ing : ingredients) {
 					ing.Move();
 					//texure height and width foer uTextelSize
@@ -651,6 +655,7 @@ int main()
                 std::string scoreText = "Score: " + std::to_string(score);
                 textRenderer.DrawText(textShader, scoreText, screen.w - 250.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
 
+			
 
                 if (isDragging && mouseTrail.size() >= 2) {
                     // 1. Disegna la scia del mouse
@@ -674,7 +679,7 @@ int main()
                     glBindVertexArray(0);
 
                     // 2. Processa il taglio sugli ingredienti
-                    processSlash(mouseTrail, perspectiveProj, view, focusBox);
+					processSlash(mouseTrail, ingProj, ingView, focusBox);
 
                 }
 

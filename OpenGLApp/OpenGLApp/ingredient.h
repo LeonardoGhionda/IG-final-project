@@ -44,6 +44,8 @@ public:
 
     void Draw(Shader shader) { 
         model.Draw(shader); 
+       
+
     }
 
     glm::mat4 GetModelMatrix() const {
@@ -55,7 +57,7 @@ public:
         ApplyGravity();
         float deltaTime = static_cast<float>(glfwGetTime()) - time;
         position += velocity * deltaTime;
-        mat = glm::translate(glm::mat4(1.0f), glm::vec3(position, 0.0f));
+       // mat = glm::translate(glm::mat4(1.0f), glm::vec3(position, 0.0f));
         updateTime();
     }
 
@@ -75,9 +77,10 @@ public:
 
     //center position in world space 
     glm::vec3 Position() const {
-        glm::vec4 centerWorldSpace = mat * glm::vec4(center, 1.0f);
-        return glm::vec3(centerWorldSpace);
+        glm::vec3 scaledCenter = glm::vec3(center) * scaleFactor;
+        return glm::vec3(position, 0.0f) + scaledCenter;
     }
+
 
     //Model center posizion in the mouse coordinate system
     glm::vec2 MCSPosition(glm::mat4 projection, glm::mat4 view) {
@@ -119,13 +122,13 @@ public:
         std::random_device rd;
         std::mt19937 gen(rd());
 
-        // Spawn solo dal basso dello schermo (asse y negativo)
-        std::uniform_real_distribution<float> distX(-screen.screenlimit.x * 0.8f, screen.screenlimit.x * 0.8f);
-        float x = distX(gen);
-        float y = -screen.screenlimit.y - 1.0f; // un po' fuori schermo in basso
+        std::uniform_real_distribution<float> distX(0.1f, 0.9f); // da 10% a 90% larghezza schermo
+        float x = distX(gen) * screen.w;
+        float y = -50.0f; // un po' sotto lo schermo (in pixel)
 
         return glm::vec2(x, y);
     }
+
 
 
     glm::vec2 getDirectionToCenter() {
