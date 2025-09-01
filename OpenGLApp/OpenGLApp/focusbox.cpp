@@ -34,12 +34,34 @@ void FocusBox::InitRenderData() {
     glBindVertexArray(0);
 }
 
+static inline float clampf(float v, float lo, float hi) {
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 void FocusBox::Move(const glm::vec2& offset) {
     center += offset;
+    // half-size in pixel (già scalato rispetto allo schermo)
+    glm::vec2 halfPx = getScaledSize();
+    // converti half-size in coordinate normalizzate
+    glm::vec2 halfNdc = glm::vec2(
+        halfPx.x / static_cast<float>(screen.w),
+        halfPx.y / static_cast<float>(screen.h)
+    );
+
+    center.x = clampf(center.x, halfNdc.x, 1.0f - halfNdc.x);
+    center.y = clampf(center.y, halfNdc.y, 1.0f - halfNdc.y);
 }
 
 void FocusBox::SetCenter(const glm::vec2& pos) {
     center = pos;
+    glm::vec2 halfPx = getScaledSize();
+    glm::vec2 halfNdc = glm::vec2(
+        halfPx.x / static_cast<float>(screen.w),
+        halfPx.y / static_cast<float>(screen.h)
+    );
+
+    center.x = clampf(center.x, halfNdc.x, 1.0f - halfNdc.x);
+    center.y = clampf(center.y, halfNdc.y, 1.0f - halfNdc.y);
 }
 
 glm::vec2 FocusBox::GetCenter() const {
@@ -51,9 +73,13 @@ glm::vec2 FocusBox::GetSize() const {
 }
 
 bool FocusBox::Contains(const glm::vec2& screenPoint) const {
+    // centro in pixel
+    glm::vec2 centerPx = glm::vec2(center.x * screen.w, center.y * screen.h);
+    // half-size in pixel (già scalato)
+    glm::vec2 halfPx = const_cast<FocusBox*>(this)->getScaledSize();
     // center e size sono in pixel (size = semi-lati)
-    return screenPoint.x >= center.x - size.x && screenPoint.x <= center.x + size.x &&
-        screenPoint.y >= center.y - size.y && screenPoint.y <= center.y + size.y;
+    return (screenPoint.x >= centerPx.x - halfPx.x && screenPoint.x <= centerPx.x + halfPx.x) &&
+        (screenPoint.y >= centerPx.y - halfPx.y && screenPoint.y <= centerPx.y + halfPx.y);
 }
 
 void FocusBox::Draw(const Shader& shader, int screenWidth, int screenHeight) {
