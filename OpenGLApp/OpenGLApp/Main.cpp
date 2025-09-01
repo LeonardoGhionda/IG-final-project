@@ -31,6 +31,7 @@ void processInput(GLFWwindow* window,FocusBox& focusBox);
 float lastX = screen.w / 2.0f;
 float lastY = screen.h / 2.0f;
 bool firstMouse = true;
+float scoreScrollOffset = 0.0f;
 Screen screen = Screen::S16_9();
 //ciao
 // camera
@@ -718,6 +719,24 @@ int main()
         }
 
         else if (gameState == GameState::SCORES) {
+			
+			ourShader.use();
+			////////////////////////
+			glDisable(GL_DEPTH_TEST);
+
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+
+			// Background
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			ourShader.setMat4("model", model);
+			ourShader.setBool("hasTexture", true);  // background ha texture
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
+			backgroundPlane.Draw(ourShader);
+			
 
 			ScoreManager manager;
 			auto scores = manager.LoadScores("score.txt");
@@ -725,30 +744,45 @@ int main()
 			textShader.use();
 			glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
 			textShader.setMat4("projection", projection);
-
-			float y = screen.h - 100.0f;
 			float x = 100.0f;
-
-			// Titolo classifica
-			textRenderer.DrawText(textShader, "PUNTEGGI", x, y, 1.5f, glm::vec3(1.0f, 0.8f, 0.0f));
-			y -= 80.0f;
-
-			if (scores.empty()) {
-				// Nessun punteggio registrato
-				textRenderer.DrawText(textShader, "Nessun punteggio salvato.", x, y, 1.0f, glm::vec3(1.0f));
-			}
-			else {
-				int index = 1;
-				for (const auto& entry : scores) {
-					std::string line = std::to_string(index++) + ". " + entry.name + ": " + std::to_string(entry.score);
-					textRenderer.DrawText(textShader, line, x, y, 1.0f, glm::vec3(1.0f));
-					y -= 60.0f;  // Spaziatura tra le righe
+		
+			// Base Y sotto il titolo
+			float baseY = screen.h - 180.0f;
+			float y = baseY + scoreScrollOffset;
+			float lineHeight = 60.0f;
+			// Titolo classifica FISSO
+			textRenderer.DrawText(textShader, "HIGH SCORES", x, screen.h - 100.0f, 1.5f, glm::vec3(0.0f));
+			int index = 1;
+			for (const auto& entry : scores) {
+				glm::vec3 color;
+				switch (index) {
+				case 1: color = glm::vec3(1.0f, 0.84f, 0.0f); break;
+				case 2: color = glm::vec3(0.75f); break;
+				case 3: color = glm::vec3(0.8f, 0.5f, 0.2f); break;
+				default: color = glm::vec3(0.0f); break;
 				}
+
+				float upperLimit = screen.h - 120.0f; // bordo inferiore del titolo
+				float lowerLimit = 0.0f;
+				if (y + lineHeight > upperLimit) {
+					y += 10;
+					index++;
+					continue;
+				}
+				if (y < lowerLimit) { // troppo in basso (fuori schermo)
+					y += 10;
+					index++;
+					continue;
+				}
+
+
+				std::string line = std::to_string(index++) + ". " + entry.name + ": " + std::to_string(entry.score);
+				textRenderer.DrawText(textShader, line, x, y, 1.0f, color);
+				y -= lineHeight;
 			}
-			if (textRenderer.Characters.empty()) {
-				std::cerr << "Font non inizializzato!\n";
-				continue;  // Salta il frame, non blocca il gioco
-			}
+
+
+
 
 		}
 		else if (gameState == GameState::NAME_INPUT) {
@@ -932,7 +966,8 @@ void processInput(GLFWwindow* window, FocusBox& focusBox)
             
         }
         else if (gameState == GameState::SCORES || gameState == GameState::INFO || gameState==GameState::PAUSED) {
-           
+			scoreScrollOffset = 0.0f;
+
             gameState = GameState::MENU;            
         }
         else if(gameState == GameState::MENU ) {
@@ -1036,7 +1071,19 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
-{
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+	if (gameState == GameState::SCORES) {
+		// ROTELLINA GIÙ (yoffset < 0) → scrollOffset aumenta → righe vanno su
+		scoreScrollOffset -= static_cast<float>(-yoffset) * 30.0f;
 
+		// Calcolo max scroll dinamico in base all'altezza visibile
+		int numEntries = ScoreManager::LoadScores("score.txt").size();
+		float lineHeight = 40.0f;
+		float visibleHeight = screen.h - 180.0f; // altezza visibile sotto il titolo
+
+		float maxScroll = glm::max(0.0f, numEntries * lineHeight - visibleHeight);
+		scoreScrollOffset = glm::clamp(scoreScrollOffset, 0.0f, maxScroll);
+	}
 }
+
+
