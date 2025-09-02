@@ -24,24 +24,19 @@ void ScoreManager::processSlash(const std::vector<glm::vec2>& trail,
                                 const glm::mat4& view,
                                 FocusBox& focusBox,
                                 std::vector<Ingredient>& ingredients,
+                                std::vector<std::string>& ingredientIds,   // <---
                                 std::vector<SlashEffect>& activeCuts,
                                 const Screen& screen,
                                 double now,
                                 GameState& gameState)
 {
     if (trail.size() < 2) return;
-
-    // Raggio di hit test in pixel (come nel tuo codice)
     const float radius = 40.0f;
 
     for (auto it = ingredients.begin(); it != ingredients.end(); /* ++it gestito sotto */) {
-
-        // Posizione oggetto in coordinate schermo (pixel)
         glm::vec2 objPos = it->MCSPositionOrtho(projection, view);
 
         bool hit = false;
-
-        // Trova subito il primo segmento che colpisce
         for (size_t i = 1; i < trail.size(); ++i) {
             const glm::vec2 a  = trail[i - 1];
             const glm::vec2 b  = trail[i];
@@ -57,60 +52,60 @@ void ScoreManager::processSlash(const std::vector<glm::vec2>& trail,
 
             if (dist < radius) {
                 hit = true;
-
-                // Effetto taglio subito (niente secondo loop)
-                SlashEffect fx;
-                fx.start = a;
-                fx.end   = b;
-                fx.timestamp = now;          // passato da fuori (ex glfwGetTime())
+                SlashEffect fx{ a, b, now };
                 activeCuts.push_back(fx);
                 break;
             }
         }
 
         if (hit) {
-            // ---- Calcolo inFocus (0..1 come nel pass blur) ----
+            // focusbox 0..1 come prima
             glm::vec2 rectSize01 = focusBox.getScaledSize() * 2.0f;
             rectSize01.x /= static_cast<float>(screen.w);
             rectSize01.y /= static_cast<float>(screen.h);
 
-            glm::vec2 rectCenter01 = focusBox.GetCenter();  // già 0..1
-            float rectMinX = rectCenter01.x - rectSize01.x * 0.5f;
-            float rectMaxX = rectCenter01.x + rectSize01.x * 0.5f;
+            glm::vec2 rectCenter01 = focusBox.GetCenter();
+            float rectMinX = glm::max(0.0f, rectCenter01.x - rectSize01.x * 0.5f);
+            float rectMaxX = glm::min(1.0f, rectCenter01.x + rectSize01.x * 0.5f);
 
-            // inverti Y come nel blur
             float rectCenterY01 = 1.0f - rectCenter01.y;
-            float rectMinY = rectCenterY01 - rectSize01.y * 0.5f;
-            float rectMaxY = rectCenterY01 + rectSize01.y * 0.5f;
+            float rectMinY = glm::max(0.0f, rectCenterY01 - rectSize01.y * 0.5f);
+            float rectMaxY = glm::min(1.0f, rectCenterY01 + rectSize01.y * 0.5f);
 
-            // clamp ai bordi
-            rectMinX = glm::max(0.0f, rectMinX);
-            rectMinY = glm::max(0.0f, rectMinY);
-            rectMaxX = glm::min(1.0f, rectMaxX);
-            rectMaxY = glm::min(1.0f, rectMaxY);
-
-            // posizione oggetto 0..1 (Y invertita)
             const float objX01 = objPos.x / static_cast<float>(screen.w);
             const float objY01 = 1.0f - (objPos.y / static_cast<float>(screen.h));
-
             const bool inFocus =
                 (objX01 >= rectMinX && objX01 <= rectMaxX) &&
                 (objY01 >= rectMinY && objY01 <= rectMaxY);
 
-            // ---- punteggio / vite ----
+            // indice corrente per leggere/raschiare l'ID parallelo
+            const size_t idx = static_cast<size_t>(std::distance(ingredients.begin(), it));
+            const std::string id = (idx < ingredientIds.size()) ? ingredientIds[idx] : std::string{};
+
             if (it->IsBomb()) {
-                // bomba: vita -1 ovunque
                 loseLife(1, gameState);
             } else {
                 if (inFocus) {
-                    addScore(+1);
+                    if (isRequiredId(id)) {
+                        addScore(+1);
+                        int& c = m_collected[id];
+                        if (c < getRequiredQty(id)) c++;
+                        if (isRecipeComplete()) {
+                            gameState = GameState::NAME_INPUT;
+                        }
+                    } else {
+                        addScore(-1);
+                    }
                 } else {
                     addScore(-1);
                 }
             }
 
-            // rimuovi l'ingrediente colpito
+            // rimuovi sia l'ingrediente sia il suo ID parallelo
             it = ingredients.erase(it);
+            if (idx < ingredientIds.size()) {
+                ingredientIds.erase(ingredientIds.begin() + idx);
+            }
         } else {
             ++it;
         }

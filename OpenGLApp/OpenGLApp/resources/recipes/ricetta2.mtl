@@ -1,7 +1,7 @@
-# Blender 4.2.3 LTS MTL File: 'ricetta1.blend'
+# Blender 4.2.3 LTS MTL File: 'None'
 # www.blender.org
 
-newmtl Material
+newmtl Material.011
 Ns 250.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.500000 0.500000 0.500000
@@ -9,9 +9,39 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/pergamena.jpg
+map_Kd pergamena.jpg
 
-newmtl Material.001
+newmtl Material.012
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd textures/eggs.jpg
+
+newmtl Material.013
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd textures/flour.jpg
+
+newmtl Material.014
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd textures/milk.jpg
+
+newmtl Material.015
 Ns 250.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.073965 0.012196 0.003998
@@ -21,7 +51,7 @@ Ni 1.500000
 d 1.000000
 illum 2
 
-newmtl Material.002
+newmtl Material.016
 Ns 250.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.500000 0.500000 0.500000
@@ -29,37 +59,7 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/butter.jpg
-
-newmtl Material.003
-Ns 250.000000
-Ka 1.000000 1.000000 1.000000
-Ks 0.500000 0.500000 0.500000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-d 1.000000
-illum 2
-map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/eggs.jpg
-
-newmtl Material.004
-Ns 250.000000
-Ka 1.000000 1.000000 1.000000
-Ks 0.500000 0.500000 0.500000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-d 1.000000
-illum 2
-map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/flour.jpg
-
-newmtl Material.006
-Ns 250.000000
-Ka 1.000000 1.000000 1.000000
-Ks 0.500000 0.500000 0.500000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-d 1.000000
-illum 2
-map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/milk.jpg
+map_Kd textures/butter.jpg
 
 newmtl Material.035
 Ns 250.000000
@@ -69,9 +69,9 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd C:/Users/asche/Desktop/PoliTo/MAGISTRALE/PRIMO ANNO/Informatica grafica/modelliOpenGL/Ingredienti/apple.jpg
+map_Kd textures/apple.jpg
 
-newmtl ricetta1
+newmtl ricetta1.001
 Ns 250.000000
 Ka 1.000000 1.000000 1.000000
 Ks 0.500000 0.500000 0.500000
