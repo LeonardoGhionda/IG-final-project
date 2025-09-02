@@ -715,14 +715,14 @@ int main() {
                 
                 // Separatore 
                 float sepMargin = 180.0f;                  // <-- regola quanto "accorciare"
-                float sepW = bw;
+                float sepW = bw - sepMargin;
 
                 glm::mat4 sm(1.0f);
                 sm = glm::translate(sm, glm::vec3(innerX + sepW, y + 2.0f, 0.0f));
                 sm = glm::scale(sm, glm::vec3(sepW, 2.0f, 1.0f));
                 ourShader.setMat4("model", sm);
                 ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-                backgroundPlane.Draw(ourShader);
+                //backgroundPlane.Draw(ourShader);
                
                 textRenderer.DrawText(textShader, std::to_string(index), xRank + 30 , y + 18.0f, 0.9f, glm::vec3(0.12f, 0.08f, 0.06f));
 
