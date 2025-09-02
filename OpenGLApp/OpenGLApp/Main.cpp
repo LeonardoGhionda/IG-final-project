@@ -4,9 +4,17 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <random>
+#include <limits>
+#include <vector>
+
 #include <ft2build.h>
 #include FT_FREETYPE_H
+
 #include "shader.h"
 #include "camera.h"
 #include "model.h"
@@ -14,50 +22,52 @@
 #include "vecplus.h"
 #include "screen.h"
 #include "keys.h"
-#include <random>
-#include <deque>
-#include <limits>
 #include "ScoreManager.h"
 #include "TextRenderer.h"
 #include "focusbox.h"
 #include "button.h"
+#include "Effects.h"
+#include "GameState.h"
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+// -----------------------------------------------------------------------------
+// Prototipi
+// -----------------------------------------------------------------------------
+void OnFramebufferSize(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow* window,FocusBox& focusBox);
+void processInput(GLFWwindow* window, FocusBox& focusBox);
+void character_callback(GLFWwindow* window, unsigned int codepoint);
+bool customWindowShouldClose(GLFWwindow* window);
+void SpawnRandomIngredient();
 
+// -----------------------------------------------------------------------------
+// Stato globale (ordinato: prima Screen, poi variabili che lo usano)
+// -----------------------------------------------------------------------------
+Screen screen = Screen::S16_9();
 
 float lastX = screen.w / 2.0f;
 float lastY = screen.h / 2.0f;
 bool firstMouse = true;
-float scoreScrollOffset = 0.0f;
-Screen screen = Screen::S16_9();
-//ciao
-// camera
+
 Camera camera(CAMERA_POS);
 
-float focusSpeed = 0.3f; // puoi metterlo come variabile globale
+float focusSpeed = 0.3f;
 
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-//spawn
-float spawnInterval = 2.0f;   // intervallo tra un lancio e l'altro (in secondi)
-float spawnTimer = 0.0f;      // tempo trascorso dall'ultimo lancio
+
+// spawn
+float spawnInterval = 2.0f;
+float spawnTimer = 0.0f;
 
 TextRenderer textRenderer;
 
-//score
 bool endGame = false;
-int score = 0;
 std::string inputName = "";
 bool isTypingName = false;
-//vite
-int lives = 3;
-//fullscreen
+
 bool fullscreen = false;
-bool Esc = false;
 
 glm::vec2 mousePos = glm::vec2(0.0f);
 glm::vec2 mouseScreenPos = glm::vec2(0.0f);
@@ -67,44 +77,27 @@ Keys keys;
 std::random_device rd;
 std::mt19937 gen(rd());
 
+static ScoreManager scoreManager(3);
 
-struct SlashPoint { double x, y; double t; };
-std::vector<SlashPoint> stroke;
-bool slashing = false;
-const double MAX_AGE_MS = 120.0;      // opzionale: “decadimento” della scia
-const float  MIN_SPEED = 800.0f;      // soglia per considerare un vero colpo
-struct SlashEffect {
-    glm::vec2 start;
-    glm::vec2 end;
-    double timestamp;  // tempo in secondi
-};
-
+// effetti taglio
 std::vector<SlashEffect> activeCuts;
 
-enum class GameState {
-	MENU,
-	PLAYING,
-	SCORES,
-	INFO,
-	PAUSED,
-	NAME_INPUT,
-};
-
-//mouse trail
+// mouse trail
 std::vector<glm::vec2> mouseTrail;
 bool isDragging = false;
 
 unsigned int trailVAO = 0, trailVBO = 0;
 Shader* trailShader = nullptr;
 
+// gioco
 GameState gameState = GameState::MENU;
-std::deque<Ingredient> ingredients;
-std::string playerName = "Player1"; // Default player name, can be changed later
-//Ingredient* active = nullptr;
+std::vector<Ingredient> ingredients;
 
-
+// -----------------------------------------------------------------------------
+// Funzioni di supporto
+// -----------------------------------------------------------------------------
 bool customWindowShouldClose(GLFWwindow* window) {
-	return glfwWindowShouldClose(window);
+    return glfwWindowShouldClose(window);
 }
 
 void SpawnRandomIngredient() {
@@ -122,12 +115,12 @@ void SpawnRandomIngredient() {
          "resources/ingredients/vanilla/vanilla.obj",
          "resources/ingredients/apple/apple.obj",
          "resources/ingredients/strawberry/strawberry.obj",
-		 "resources/ingredients/lem_marcio/lim_marcio.obj",
-		 "resources/ingredients/apple_gold/mela_oro.obj",
-		  "resources/ingredients/choc_marcio/cioc_marcio.obj",
-		 "resources/ingredients/strawb_gold/fragola_oro.obj",
-       
-        // altri ingredienti qui
+         "resources/ingredients/lem_marcio/lim_marcio.obj",
+         "resources/ingredients/apple_gold/mela_oro.obj",
+          "resources/ingredients/choc_marcio/cioc_marcio.obj",
+         "resources/ingredients/strawb_gold/fragola_oro.obj",
+
+         // altri ingredienti qui
     };
 
     int index = rand() % allIngredients.size();
@@ -135,23 +128,23 @@ void SpawnRandomIngredient() {
 
     bool spawnBomb = (rand() % 100) < 20; // 20% bomba
     std::string path = spawnBomb
-        ? "resources/ingredients/bomb/bomb.obj"      
+        ? "resources/ingredients/bomb/bomb.obj"
         : allIngredients[rand() % allIngredients.size()];
 
 
-	// Direzione verso l'alto e centro, con piccola deviazione casuale
-	glm::vec2 target(screen.w * 0.5f, screen.h * 0.7f); // centro alto
-	glm::vec2 dir = glm::normalize(target - spawn);
+    // Direzione verso l'alto e centro, con piccola deviazione casuale
+    glm::vec2 target(screen.w * 0.5f, screen.h * 0.7f); // centro alto
+    glm::vec2 dir = glm::normalize(target - spawn);
 
 
-	// ±12° per ridurre lo sbandamento laterale
-	float angleOffset = ((rand() % 24) - 12) * 0.01745f;
-	dir = RotateVec2(dir, angleOffset);
+    // ±12° per ridurre lo sbandamento laterale
+    float angleOffset = ((rand() % 24) - 12) * 0.01745f;
+    dir = RotateVec2(dir, angleOffset);
 
-	// spinta un po' più “verticale/arcata”
-	float speed = 600.0f + static_cast<float>(rand() % 100); // 600–699
+    // spinta un po' più “verticale/arcata”
+    float speed = 600.0f + static_cast<float>(rand() % 100); // 600–699
 
-	float scale = 30.0f;
+    float scale = 30.0f;
 
     Ingredient item(path.c_str(), spawn, scale, spawnBomb);
     item.SetVelocity(dir * speed);
@@ -162,121 +155,11 @@ void SpawnRandomIngredient() {
 }
 
 void character_callback(GLFWwindow* window, unsigned int codepoint) {
-	if (gameState == GameState::NAME_INPUT) {
-		if (codepoint == GLFW_KEY_BACKSPACE && !inputName.empty()) {
-			inputName.pop_back();
-		}
-		else if (inputName.size() < 12 && codepoint >= 32 && codepoint <= 126) {
-			inputName += static_cast<char>(codepoint);
-		}
-	}
-}
-void processSlash(const std::vector<glm::vec2>& trail, const glm::mat4& projection, const glm::mat4& view, FocusBox& focusBox) {
-    if (trail.size() < 2) return;
-
-    for (auto it = ingredients.begin(); it != ingredients.end(); /* ++it gestito dentro */) {
-        glm::vec2 objPos = it->MCSPositionOrtho(projection, view);
-        float radius = 40.0f; // soglia fissa, in pixel
-
-
-        bool hit = false;
-
-        for (size_t i = 1; i < trail.size(); ++i) {
-            glm::vec2 a = trail[i - 1];
-            glm::vec2 b = trail[i];
-            glm::vec2 ab = b - a;
-            glm::vec2 ap = objPos - a;
-            float ab2 = glm::dot(ab, ab);
-            if (ab2 < 0.0001f) continue;  // ignora segmenti nulli
-
-            float t = glm::clamp(glm::dot(ap, ab) / ab2, 0.0f, 1.0f);
-
-            glm::vec2 closest = a + t * ab;
-            float dist = glm::length(closest - objPos);
-
-            if (dist < radius ) {  // soglia in pixel
-                hit = true;
-                break;
-            }
-        }
-
-        if (hit) {
-            // Trova il segmento che ha colpito
-            for (size_t i = 1; i < trail.size(); ++i) {
-                glm::vec2 a = trail[i - 1];
-                glm::vec2 b = trail[i];
-                glm::vec2 ab = b - a;
-                glm::vec2 ap = objPos - a;
-                float ab2 = glm::dot(ab, ab);
-                if (ab2 < 0.0001f) continue;
-
-                float t = glm::clamp(glm::dot(ap, ab) / ab2, 0.0f, 1.0f);
-                glm::vec2 closest = a + t * ab;
-                float dist = glm::length(closest - objPos);
-
-                if (dist < radius) {
-                    // Aggiungi un effetto taglio
-                    SlashEffect fx;
-                    fx.start = a;
-                    fx.end = b;
-                    fx.timestamp = glfwGetTime();
-                    activeCuts.push_back(fx);
-                  
-                }
-            }
-			// Gestione punteggio e vite
-            // --- calcolo "inFocus" in 0..1 come nel pass blur ---
-            glm::vec2 rectSize01 = focusBox.getScaledSize() * 2.0f;
-            rectSize01.x /= screen.w;
-            rectSize01.y /= screen.h;
-
-            glm::vec2 rectCenter01 = focusBox.GetCenter(); // già 0..1
-            float rectMinX = rectCenter01.x - rectSize01.x * 0.5f;
-            float rectMaxX = rectCenter01.x + rectSize01.x * 0.5f;
-
-            // nel pass blur inverti Y (1 - y); qui facciamo lo stesso
-            float rectCenterY01 = 1.0f - rectCenter01.y;
-            float rectMinY = rectCenterY01 - rectSize01.y * 0.5f;
-            float rectMaxY = rectCenterY01 + rectSize01.y * 0.5f;
-
-            // clampa nei bordi (opzionale, come fai nel render)
-            rectMinX = glm::max(0.0f, rectMinX);
-            rectMinY = glm::max(0.0f, rectMinY);
-            rectMaxX = glm::min(1.0f, rectMaxX);
-            rectMaxY = glm::min(1.0f, rectMaxY);
-
-            // posizione oggetto da pixel -> 0..1 (e Y invertita come sopra)
-            float objX01 = objPos.x / (float)screen.w;
-            float objY01 = 1.0f - (objPos.y / (float)screen.h);
-
-            bool inFocus =
-                (objX01 >= rectMinX && objX01 <= rectMaxX) &&
-                (objY01 >= rectMinY && objY01 <= rectMaxY);
-
-            // --- punteggio / vite ---
-            if (it->IsBomb()) {
-                // bomba: vita -1 ovunque
-                lives = std::max(0, lives - 1);
-            }
-            else {
-                if (inFocus) {
-                    score += 1;
-                }
-                else {
-                    score = std::max(0, score - 1);
-                }
-            }
-
-
-
-            it = ingredients.erase(it);
-
-            if (lives == 0) {
-                gameState = GameState::NAME_INPUT;
-            }
-        }
-        else {
-            ++it;
+    if (gameState == GameState::NAME_INPUT) {
+        if (codepoint == GLFW_KEY_BACKSPACE && !inputName.empty()) {
+            inputName.pop_back();
+        } else if (inputName.size() < 12 && codepoint >= 32 && codepoint <= 126) {
+            inputName += static_cast<char>(codepoint);
         }
     }
 }
@@ -308,94 +191,75 @@ static void buildRoundedRectOutline(float x, float y, float w, float h,
     // chiudi la strip tornando al primo punto
     out.push_back(out.front());
 }
-
-
-int main()
-{
-
-	// glfw: initialize and configure
-	// ------------------------------
-	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
+// -----------------------------------------------------------------------------
+// main
+// -----------------------------------------------------------------------------
+int main() {
+    // glfw: init
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifdef __APPLE__
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-	// glfw window creation
-	// --------------------
-	GLFWwindow* window = glfwCreateWindow(screen.w, screen.h, "Model_Loader", NULL, NULL);
-	if (window == NULL)
-	{
-		std::cout << "Failed to create GLFW window" << std::endl;
-		glfwTerminate();
-		return -1;
-	}
-
-	std::ifstream shaderCheck("text.vs");
-	if (!shaderCheck.is_open()) {
-		std::cerr << " text.vs non trovato nella working directory\n";
-	}
-
-
-	glfwMakeContextCurrent(window);
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	glfwSetCursorPosCallback(window, mouse_callback);
-	glfwSetScrollCallback(window, scroll_callback);
-	// tell GLFW to capture our mouse
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-	glfwSetCharCallback(window, character_callback);
-
-    // glad: load all OpenGL function pointers
-    // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
-        std::cout << "Failed to initialize GLAD" << std::endl;
+    // window
+    GLFWwindow* window = glfwCreateWindow(screen.w, screen.h, "Model_Loader", NULL, NULL);
+    if (window == NULL) {
+        std::cout << "Failed to create GLFW window\n";
+        glfwTerminate();
         return -1;
     }
-    trailShader = new Shader("mouseTrail.vs", "mouseTrail.fs");
 
+    std::ifstream shaderCheck("text.vs");
+    if (!shaderCheck.is_open()) {
+        std::cerr << "text.vs non trovato nella working directory\n";
+    }
+
+    glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, OnFramebufferSize);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwSetCharCallback(window, character_callback);
+
+    // glad
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        std::cout << "Failed to initialize GLAD\n";
+        return -1;
+    }
+
+    // line shader per scie
+    trailShader = new Shader("mouseTrail.vs", "mouseTrail.fs");
     glGenVertexArrays(1, &trailVAO);
     glGenBuffers(1, &trailVBO);
-
     glBindVertexArray(trailVAO);
     glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 2 * 500, nullptr, GL_DYNAMIC_DRAW); // spazio per 250 segmenti
-
-
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 2 * 500, nullptr, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-
-
     // focus box
-    FocusBox focusBox(glm::vec2(200.0f, 120.0f)); // larghezza 200, altezza 120
+    FocusBox focusBox(glm::vec2(200.0f, 120.0f));
+    focusBox.SetCenter(glm::vec2(0.5f, 0.5f)); // in 0..1
 
-   	focusBox.SetCenter(glm::vec2(1.0f / 2.0f, 1.0f / 2.0f)); //cambiato da pixel a percentuale schermo
+    // testo
+    Shader textShader("text.vs", "text.fs");
+    if (!textRenderer.Load("resources/arial.ttf", 48)) {
+        std::cerr << "Errore caricamento font!\n";
+        return -1;
+    }
+    textShader.use();
+    glm::mat4 textProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+    textShader.setMat4("projection", textProj);
 
-	Shader textShader("text.vs", "text.fs"); // Shader per testo
-	if (!textRenderer.Load("resources/arial.ttf", 48)) {
-		std::cerr << "Errore caricamento font!\n";
-		return -1;
-	}
-	textShader.use();
-	glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(screen.w), 0.0f, static_cast<float>(screen.h));
-	textShader.setMat4("projection", projection);
-
-
-	// tell stb_image.h to flip loaded texture's on the y-axis (before loading model).
-	//stbi_set_flip_vertically_on_load(true);
-
-	// configure global opengl state
-	// -----------------------------
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // opengl state
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	// build and compile shaders
 	// -------------------------
@@ -420,179 +284,125 @@ int main()
 	float scoresYScale = 1.0f;
 	float infoYScale = 1.0f;
 
-	// Calcolo altezza totale
-	float totalHeight =
-		baseSize.y * playYScale +
-		baseSize.y * scoresYScale +
-		baseSize.y * infoYScale +
-		2 * spacing;
+    Button playButton{  glm::vec2(0.5f, 0.75f), baseSize, playYScale,   "PLAY"   };
+    Button scoresButton{glm::vec2(0.5f, 0.50f), baseSize, scoresYScale, "SCORES" };
+    Button infoButton{  glm::vec2(0.5f, 0.25f), baseSize, infoYScale,   "INFO"   };
 
-	float topY = screen.h / 2.0f + totalHeight / 2.0f - baseSize.y * playYScale / 2.0f;
+    // loop
+    while (!customWindowShouldClose(window)) {
+        float currentFrame = (float)glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
 
-	Button playButton{
-		glm::vec2(1.0f / 2, 3.0f / 4),
-		baseSize,
-		playYScale,
-		"PLAY"
-	};
+        processInput(window, focusBox);
 
-	Button scoresButton{
-		glm::vec2(1.0f / 2, 2.0f / 4),
-		baseSize,
-		scoresYScale,
-		"SCORES"
-	};
+        glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	Button infoButton{
-		glm::vec2(1.0f / 2, 1.0f / 4),
-		baseSize,
-		infoYScale,
-		"INFO"
-	};
+        if (gameState == GameState::MENU) {
+            ourShader.use();
+            glDisable(GL_DEPTH_TEST);
 
-	// Per bitmap: g->bitmap.buffer
-	// Per contorni: g->outline
+            glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+            ourShader.setMat4("projection", orthoProj);
+            ourShader.setMat4("view", glm::mat4(1.0f));
 
-	// 4. Da outline → mesh
-	// g->outline: contiene i contorni vettoriali della lettera
-	// draw in wireframe
-	// glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            // background
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+            ourShader.setMat4("model", model);
+            ourShader.setBool("hasTexture", true);
+            ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+            backgroundPlane.Draw(ourShader);
 
-	glDisable(GL_CULL_FACE);
-	//glCullFace(GL_BACK); // Cull back faces
-	//glFrontFace(GL_CCW); // Front faces are counter-clockwise by default
+            // bottoni
+            ourShader.setBool("hasTexture", false);
+            playButton.Draw(ourShader, playButtonModel);
+            scoresButton.Draw(ourShader, scoresButtonModel);
+            infoButton.Draw(ourShader, infoButtonModel);
 
-	// render loop
-	// -----------
-	while (!customWindowShouldClose(window)) {
-
-		float currentFrame = static_cast<float>(glfwGetTime());
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
-
-        processInput(window,focusBox);
-
-		glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	
-		if (gameState == GameState::MENU) {
-
-			ourShader.use();
-			////////////////////////
-			glDisable(GL_DEPTH_TEST);
-
-			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-			ourShader.setMat4("projection", orthoProj);
-			ourShader.setMat4("view", glm::mat4(1.0f));
-
-			// Background
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
-			ourShader.setMat4("model", model);
-			ourShader.setBool("hasTexture", true);  // background ha texture
-			ourShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
-			backgroundPlane.Draw(ourShader);
-			/////////////////////
-
-			// Play button (senza texture, colore da MTL o fisso)
-			ourShader.setBool("hasTexture", false);
-			playButton.Draw(ourShader, playButtonModel);
-
-			// Scores button
-			ourShader.setBool("hasTexture", false);
-			scoresButton.Draw(ourShader, scoresButtonModel);
-
-			// Info button
-			ourShader.setBool("hasTexture", false);
-			infoButton.Draw(ourShader, infoButtonModel);
-
-			if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && playButton.isClicked(mousePos)) {
-				ingredients.clear();
-				score = 0;
-				spawnTimer = 0.0f; // Reset timer
-                lives = 3;
-                gameState = GameState::PLAYING;         
+            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && playButton.isClicked(mousePos)) {
+                ingredients.clear();
+                activeCuts.clear();
+                spawnTimer = 0.0f;
+                scoreManager.reset(3);           // reset punteggio e vite
+                gameState = GameState::PLAYING;
                 glEnable(GL_DEPTH_TEST);
                 continue;
-			}
-			if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && scoresButton.isClicked(mousePos)) {
-				std::cout << "Scores clicked\n";
-				gameState = GameState::SCORES;
-			}
+            }
+            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && scoresButton.isClicked(mousePos)) {
+                gameState = GameState::SCORES;
+            }
+            if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && infoButton.isClicked(mousePos)) {
+                gameState = GameState::INFO;
+            }
+        }
+        else if (gameState == GameState::PLAYING) {
+            const double now = glfwGetTime();
+            blurShader.use();
 
-			if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && infoButton.isClicked(mousePos)) {
-				std::cout << "Info clicked\n";
-				gameState = GameState::INFO;
-			}
+            blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
 
-		}
-		else if (gameState == GameState::PLAYING) {
+            // rettangolo non soggetto al blur 
+            //--------------------------------
+            glm::vec2 rectSize = focusBox.getScaledSize() * 2.0f;
+            glm::vec2 rectPos = focusBox.GetCenter();
+            //normalizzazione della size  
+            rectSize.x /= screen.w;
+            rectSize.y /= screen.h;
+            //invert y 
+            rectPos.y = 1 - rectPos.y;
+            //calcolo min
+            float rectMinX = rectPos.x - rectSize.x / 2.0f;
+            if (rectMinX < 0.0f) rectMinX = 0.0f;
+            float rectMinY = rectPos.y - rectSize.y / 2.0f;
+            if (rectMinY < 0.0f) rectMinY = 0.0f;
+            blurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
+            //calcolo max
+            float rectMaxX = rectPos.x + rectSize.x / 2.0f;
+            if (rectMaxX > 1.0f) rectMaxX = 1.0f;
+            float rectMaxY = rectPos.y + rectSize.y / 2.0f;
+            if (rectMaxY > 1.0f) rectMaxY = 1.0f;
+            blurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
+            //------------------------------------------------------------
 
-			blurShader.use();
+            glDisable(GL_DEPTH_TEST);
 
-			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
-
-			// rettangolo non soggetto al blur 
-			//--------------------------------
-			glm::vec2 rectSize = focusBox.getScaledSize() * 2.0f;
-			glm::vec2 rectPos = focusBox.GetCenter();
-			//normalizzazione della size  
-			rectSize.x /= screen.w;
-			rectSize.y /= screen.h;
-			//invert y 
-			rectPos.y = 1 - rectPos.y;
-			//calcolo min
-			float rectMinX = rectPos.x - rectSize.x / 2.0f;
-			if (rectMinX < 0.0f) rectMinX = 0.0f;
-			float rectMinY = rectPos.y - rectSize.y / 2.0f;
-			if (rectMinY < 0.0f) rectMinY = 0.0f;
-			blurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
-			//calcolo max
-			float rectMaxX = rectPos.x + rectSize.x / 2.0f;
-			if (rectMaxX > 1.0f) rectMaxX = 1.0f;
-			float rectMaxY = rectPos.y + rectSize.y / 2.0f;
-			if (rectMaxY > 1.0f) rectMaxY = 1.0f;
-			blurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
-			//------------------------------------------------------------
-
-			glDisable(GL_DEPTH_TEST);
-
-			// Background
-			//-----------------
-			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-			blurShader.setMat4("projection", orthoProj);
-			blurShader.setMat4("view", glm::mat4(1.0f));
+            // Background
+            //-----------------
+            glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+            blurShader.setMat4("projection", orthoProj);
+            blurShader.setMat4("view", glm::mat4(1.0f));
 
 
-			glm::mat4 model = glm::mat4(1.0f);
-			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
-			blurShader.setMat4("model", model);
-			blurShader.setBool("hasTexture", true);  // background ha texture
-			blurShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
-			backgroundPlane.Draw(blurShader);
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+            blurShader.setMat4("model", model);
+            blurShader.setBool("hasTexture", true);  // background ha texture
+            blurShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
+            backgroundPlane.Draw(blurShader);
 
-			// Ingredients
-			//---------------
-			glm::mat4 ingProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-			glm::mat4 ingView(1.0f);
-			glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-			glm::mat4 view = camera.GetViewMatrix();
-			model = glm::scale(model, glm::vec3(20.0f));  // per test visibilità
+            // Ingredients
+            //---------------
+            glm::mat4 ingProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+            glm::mat4 ingView(1.0f);
+            glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+            glm::mat4 view = camera.GetViewMatrix();
+            model = glm::scale(model, glm::vec3(20.0f));  // per test visibilità
 
-			spawnTimer += deltaTime;
-			if (spawnTimer >= spawnInterval) {
-				SpawnRandomIngredient();
-				spawnTimer = 0.0f;
-			}
-			
-						
+            spawnTimer += deltaTime;
+            if (spawnTimer >= spawnInterval) {
+                SpawnRandomIngredient();
+                spawnTimer = 0.0f;
+            }
 
-			if (!ingredients.empty()) {	
 
-				
+
+            if (!ingredients.empty()) {
+
+
                 glEnable(GL_DEPTH_TEST);
                 ourShader.use();
                 ourShader.setVec3("diffuseColor", glm::vec3(1.0f));  // colore fallback bianco
@@ -610,142 +420,153 @@ int main()
                     }
                 }
                 else {
-                    
-                    
+
+
                     if (isDragging) {
                         isDragging = false;
-                        if (!mouseTrail.empty() && camera.Zoom != 0.0f){
+                        if (!mouseTrail.empty() && camera.Zoom != 0.0f) {
                             // Se c'è una scia, processala
-							processSlash(mouseTrail, ingProj, ingView, focusBox);
-						}
+                            scoreManager.processSlash(
+                                mouseTrail, ingProj, ingView, focusBox,
+                                ingredients, activeCuts,
+                                screen,
+                                now,
+                                gameState
+                            );
+                        }
 
                         mouseTrail.clear();
                     }
                 }
 
-				// Aggiorna e disegna tutti gli ingredienti
-				objBlurShader.use();
-				objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
-				objBlurShader.setMat4("projection", ingProj);
-				objBlurShader.setMat4("view", ingView);
-				objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
-				objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
-				
-				glDisable(GL_DEPTH_TEST);
-				for (auto& ing : ingredients) {
-					ing.Move();
-					//texure height and width foer uTextelSize
-					Texture* t = ing.getFirstTexture();
-					if (t != nullptr) {
-						int tW = t->w;
-						int tH = t->h;
-						objBlurShader.setVec2("uTexelSize", glm::vec2(1.0f / tW, 1.0f / tH));
-					}
-					objBlurShader.setMat4("model", ing.GetModelMatrix());
-					objBlurShader.setBool("hasTexture", true);
-					objBlurShader.setVec3("diffuseColor", glm::vec3(1.0f));
-					ing.Draw(objBlurShader);
+                // Aggiorna e disegna tutti gli ingredienti
+                objBlurShader.use();
+                objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+                objBlurShader.setMat4("projection", ingProj);
+                objBlurShader.setMat4("view", ingView);
+                objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
+                objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
 
-				}
-			}
-
-			glDisable(GL_DEPTH_TEST);
-                // --- UI pass: vite in alto a sinistra, senza depth test ---
-                ourShader.use();
-                glm::mat4 uiProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-                ourShader.setMat4("projection", uiProj);
-                ourShader.setMat4("view", glm::mat4(1.0f));
-                ourShader.setBool("hasTexture", true);         
-                ourShader.setVec3("diffuseColor", glm::vec3(1)); // colore fallback
-
-
-                const float padX = 60.0f;
-                const float padY = 60.0f;
-                const float iconSize = 28.0f;
-                const float step = 80.0f;
-
-                for (int i = 0; i < lives; ++i) {
-                    float x = padX + i * (iconSize + step);
-                    float y = screen.h - padY;
-
-                    glm::mat4 m(1.0f);
-                    m = glm::translate(m, glm::vec3(x, y, 0.0f));
-                    // Se il modello è centrato sull'origine, nessun offset extra:
-                    m = glm::scale(m, glm::vec3(iconSize, iconSize, 1.0f));
-                    
-
-                    ourShader.setMat4("model", m);
-                    lifeIcon.Draw(ourShader);
-                }
-                // Disegna lo score in alto a destra
-                textShader.use();
-                textShader.setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
-
-                std::string scoreText = "Score: " + std::to_string(score);
-                textRenderer.DrawText(textShader, scoreText, screen.w - 250.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
-
-			
-
-                if (isDragging && mouseTrail.size() >= 2) {
-                    // 1. Disegna la scia del mouse
-                    trailShader->use();
-
-                    glm::mat4 proj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
-                    trailShader->setMat4("projection", proj);
-                    trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f)); // giallo
-
-                    std::vector<float> trailData;
-                    for (const auto& pt : mouseTrail) {
-                        trailData.push_back(pt.x);
-                        trailData.push_back(pt.y);
+                glDisable(GL_DEPTH_TEST);
+                for (auto& ing : ingredients) {
+                    ing.Move();
+                    //texure height and width foer uTextelSize
+                    Texture* t = ing.getFirstTexture();
+                    if (t != nullptr) {
+                        int tW = t->w;
+                        int tH = t->h;
+                        objBlurShader.setVec2("uTexelSize", glm::vec2(1.0f / tW, 1.0f / tH));
                     }
-
-                    glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
-                    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * trailData.size(), trailData.data());
-
-                    glBindVertexArray(trailVAO);
-                    glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mouseTrail.size());
-                    glBindVertexArray(0);
-
-                    // 2. Processa il taglio sugli ingredienti
-					processSlash(mouseTrail, ingProj, ingView, focusBox);
+                    objBlurShader.setMat4("model", ing.GetModelMatrix());
+                    objBlurShader.setBool("hasTexture", true);
+                    objBlurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+                    ing.Draw(objBlurShader);
 
                 }
+            }
+
+            glDisable(GL_DEPTH_TEST);
+            // --- UI pass: vite in alto a sinistra, senza depth test ---
+            ourShader.use();
+            glm::mat4 uiProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+            ourShader.setMat4("projection", uiProj);
+            ourShader.setMat4("view", glm::mat4(1.0f));
+            ourShader.setBool("hasTexture", true);
+            ourShader.setVec3("diffuseColor", glm::vec3(1)); // colore fallback
 
 
-                // Disegna gli effetti di taglio (scia temporanea)
-                double now = glfwGetTime();
-                glLineWidth(4.0f);
+            const float padX = 60.0f;
+            const float padY = 60.0f;
+            const float iconSize = 28.0f;
+            const float step = 80.0f;
+
+            for (int i = 0; i < scoreManager.getLives(); ++i) {
+                float x = padX + i * (iconSize + step);
+                float y = screen.h - padY;
+
+                glm::mat4 m(1.0f);
+                m = glm::translate(m, glm::vec3(x, y, 0.0f));
+                // Se il modello è centrato sull'origine, nessun offset extra:
+                m = glm::scale(m, glm::vec3(iconSize, iconSize, 1.0f));
+
+
+                ourShader.setMat4("model", m);
+                lifeIcon.Draw(ourShader);
+            }
+            // Disegna lo score in alto a destra
+            textShader.use();
+            textShader.setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
+
+            std::string scoreText = "Score: " + std::to_string(scoreManager.getScore());
+            textRenderer.DrawText(textShader, scoreText, screen.w - 250.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
+
+
+
+            if (isDragging && mouseTrail.size() >= 2) {
+                // 1. Disegna la scia del mouse
                 trailShader->use();
-                trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f));  // bianco-giallo chiaro
-                trailShader->setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
 
-                std::vector<float> cutData;
-                for (auto it = activeCuts.begin(); it != activeCuts.end(); ) {
-                    double age = now - it->timestamp;
-                    if (age > 0.2) {
-                        it = activeCuts.erase(it);  // scade dopo 0.2s
-                        continue;
-                    }
-                    // aggiungi segmento alla linea
-                    cutData.push_back(it->start.x);
-                    cutData.push_back(it->start.y);
-                    cutData.push_back(it->end.x);
-                    cutData.push_back(it->end.y);
-                    ++it;
+                glm::mat4 proj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+                trailShader->setMat4("projection", proj);
+                trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f)); // giallo
+
+                std::vector<float> trailData;
+                for (const auto& pt : mouseTrail) {
+                    trailData.push_back(pt.x);
+                    trailData.push_back(pt.y);
                 }
 
-                if (!cutData.empty()) {
-                    glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
-                    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * cutData.size(), cutData.data());
+                glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * trailData.size(), trailData.data());
 
-                    glBindVertexArray(trailVAO);
-                    glDrawArrays(GL_LINES, 0, (GLsizei)(cutData.size() / 2));
-                    glBindVertexArray(0);
-                }       
-                glEnable(GL_DEPTH_TEST);
+                glBindVertexArray(trailVAO);
+                glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mouseTrail.size());
+                glBindVertexArray(0);
+
+                // 2. Processa il taglio sugli ingredienti
+                
+                scoreManager.processSlash(
+                    mouseTrail, ingProj, ingView, focusBox,
+                    ingredients, activeCuts,
+                    screen,
+                    now,
+                    gameState
+                );
+
+            }
+
+            // Disegna gli effetti di taglio (scia temporanea)
+            
+            glLineWidth(4.0f);
+            trailShader->use();
+            trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f));  // bianco-giallo chiaro
+            trailShader->setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
+
+            std::vector<float> cutData;
+            for (auto it = activeCuts.begin(); it != activeCuts.end(); ) {
+                double age = now - it->timestamp;
+                if (age > 0.2) {
+                    it = activeCuts.erase(it);  // scade dopo 0.2s
+                    continue;
+                }
+                // aggiungi segmento alla linea
+                cutData.push_back(it->start.x);
+                cutData.push_back(it->start.y);
+                cutData.push_back(it->end.x);
+                cutData.push_back(it->end.y);
+                ++it;
+            }
+
+            if (!cutData.empty()) {
+                glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * cutData.size(), cutData.data());
+
+                glBindVertexArray(trailVAO);
+                glDrawArrays(GL_LINES, 0, (GLsizei)(cutData.size() / 2));
+                glBindVertexArray(0);
+            }
+            glEnable(GL_DEPTH_TEST);
         }
-
         else if (gameState == GameState::SCORES) {
 			
 			ourShader.use();
@@ -946,282 +767,164 @@ int main()
 			// Mostra testo digitato
 			textRenderer.DrawText(textShader, inputName + "_", screen.w / 3, screen.h / 2, 1.0f, glm::vec3(0.5f, 1.0f, 0.5f));
 
-			// -------------------------------
-			// Gestione BACKSPACE
-			// -------------------------------
-			if (glfwGetKey(window, GLFW_KEY_BACKSPACE) == GLFW_PRESS && !inputName.empty()) {
-				static double lastDeleteTime = 0;
-				double currentTime = glfwGetTime();
+            // BACKSPACE con delay
+            if (glfwGetKey(window, GLFW_KEY_BACKSPACE) == GLFW_PRESS && !inputName.empty()) {
+                static double lastDeleteTime = 0;
+                double currentTime = glfwGetTime();
+                if (currentTime - lastDeleteTime > 0.15) {
+                    inputName.pop_back();
+                    lastDeleteTime = currentTime;
+                }
+            }
 
-				// Ritardo per evitare cancellazioni multiple in un singolo frame
-				if (currentTime - lastDeleteTime > 0.15) {
-					inputName.pop_back();
-					lastDeleteTime = currentTime;
-				}
-			}
+            // ENTER (normale + tastierino)
+            if ((glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS ||
+                 glfwGetKey(window, GLFW_KEY_KP_ENTER) == GLFW_PRESS)) {
 
-			// -------------------------------
-			// Gestione ENTER (normale + tastierino)
-			// -------------------------------
-			if ((glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS ||
-				glfwGetKey(window, GLFW_KEY_KP_ENTER) == GLFW_PRESS)) {
-
-				// Se nome vuoto, assegna "Anonimo"
-				if (inputName.empty()) {
-					playerName = "Anonimo";
-				}
-				else {
-					playerName = inputName;
-				}
-
-				// Salvataggio punteggio
-				ScoreManager manager;
-				manager.SaveScore(playerName, score);
-
-                // Vai alla classifica
+                if (inputName.empty()) inputName = "Anonimo";
+                ScoreManager::SaveScore(inputName, scoreManager.getScore());
                 gameState = GameState::SCORES;
             }
-}
-        else if(gameState == GameState::PAUSED) {
+        }
+        else if (gameState == GameState::PAUSED) {
             glDisable(GL_DEPTH_TEST);
             textShader.use();
             glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
             textShader.setMat4("projection", projection);
-            std::string pauseText = "GAME PAUSED";
-            textRenderer.DrawText(textShader, pauseText, screen.w / 2 - 150.0f,
-                screen.h / 2, 1.5f, glm::vec3(1.0f, 0.5f, 0.0f));
-            std::string resumeText = "Press P to RESUME";
-            textRenderer.DrawText(textShader, resumeText, screen.w / 2 - 200.0f,
-                screen.h / 2 - 100.0f, 1.0f, glm::vec3(1.0f));
-            std::string exitText = "Press ESC to EXIT to MENU";
-            textRenderer.DrawText(textShader, exitText, screen.w / 2 - 220.0f,
-                screen.h / 2 - 150.0f, 1.0f, glm::vec3(1.0f));
-		}
-
-		glfwSwapBuffers(window);
-		glfwPollEvents();
-		keys.Update(window);
-
+            textRenderer.DrawText(textShader, "GAME PAUSED",           screen.w / 2 - 150.0f, screen.h / 2,         1.5f, glm::vec3(1.0f, 0.5f, 0.0f));
+            textRenderer.DrawText(textShader, "Press P to RESUME",     screen.w / 2 - 200.0f, screen.h / 2 - 100.0f, 1.0f, glm::vec3(1.0f));
+            textRenderer.DrawText(textShader, "Press ESC to EXIT MENU",screen.w / 2 - 220.0f, screen.h / 2 - 150.0f, 1.0f, glm::vec3(1.0f));
         }
-        
-        if (trailShader) delete trailShader;
-        glDeleteVertexArrays(1, &trailVAO);
-        glDeleteBuffers(1, &trailVBO);
 
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-        // ------------------------------------------------------------------
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+        keys.Update(window);
+    }
+
+    if (trailShader) delete trailShader;
+    glDeleteVertexArrays(1, &trailVAO);
+    glDeleteBuffers(1, &trailVBO);
 
     glfwTerminate();
     return 0;
 }
 
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow* window, FocusBox& focusBox)
-{
-
+// -----------------------------------------------------------------------------
+// Input e callback
+// -----------------------------------------------------------------------------
+void processInput(GLFWwindow* window, FocusBox& focusBox) {
     float currentSpeed = focusSpeed * deltaTime;
 
-    //Space key 
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+    // boost con SPACE
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) currentSpeed *= 8.0f;
 
-        // se premi SPACE aumenta la velocità (es. raddoppia)
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            currentSpeed *= 8.0f; // boost mentre tieni premuto spazio
-        }
-    }
     if (gameState == GameState::PLAYING) {
-        float s = focusSpeed * deltaTime;
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) s *= 8.0f;
-
+        float s = currentSpeed;
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) focusBox.Move({ 0.0f,  s });
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) focusBox.Move({ 0.0f, -s });
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) focusBox.Move({ -s,   0.0f });
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) focusBox.Move({ s,   0.0f });
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) focusBox.Move({  s,   0.0f });
 
-        // (opzionale) frecce:
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) focusBox.Move({ 0.0f,  s });
-        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) focusBox.Move({ 0.0f,-s });
-        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) focusBox.Move({ -s, 0.0f });
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) focusBox.Move({ s, 0.0f });
+        if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS) focusBox.Move({ 0.0f,  s });
+        if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) focusBox.Move({ 0.0f, -s });
+        if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) focusBox.Move({ -s,   0.0f });
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) focusBox.Move({  s,   0.0f });
     }
-  
-    //fullscreen
-    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen==false)
-    { 
-		fullscreen = !fullscreen;
-		keys.keyLock[GLFW_KEY_F] = true;
-		GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-		const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-		glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
 
+    // fullscreen toggle
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == false) {
+        fullscreen = true;
+        keys.keyLock[GLFW_KEY_F] = true;
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
     }
-    else if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == true){
+    else if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_F] && fullscreen == true) {
         keys.keyLock[GLFW_KEY_F] = true;
         fullscreen = false;
-
-        // Torna a windowed e richiama il callback
-        screen.resetSize(); // tua funzione
+        screen.resetSize();
         glfwSetWindowMonitor(window, NULL, 100, 100, screen.w, screen.h, 0);
-
+    }
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
+        keys.keyLock[GLFW_KEY_F] = false;
     }
 
-	if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
-		keys.keyLock[GLFW_KEY_F] = false;
-	}
-
-
-	//Pause key
-	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_P]) {
-		keys.keyLock[GLFW_KEY_P] = true;
-
-        if (gameState == GameState::PLAYING) {
-            gameState = GameState::PAUSED;
-        }
-        else if (gameState == GameState::PAUSED) {
-            gameState = GameState::PLAYING;
-
-        }
+    // pausa P
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_P]) {
+        keys.keyLock[GLFW_KEY_P] = true;
+        if (gameState == GameState::PLAYING)      gameState = GameState::PAUSED;
+        else if (gameState == GameState::PAUSED)  gameState = GameState::PLAYING;
     }
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_RELEASE) {
         keys.keyLock[GLFW_KEY_P] = false;
     }
 
-    glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-    glm::mat4 view = camera.GetViewMatrix();
-
-
-	// Escape key to return to menu or exit
+    // ESC
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && !keys.keyLock[GLFW_KEY_ESCAPE]) {
         keys.keyLock[GLFW_KEY_ESCAPE] = true;
-     
+
         if (gameState == GameState::PLAYING) {
-                endGame = true;
-                
-              /*  std::cout << "\n--- FINE PARTITA ---\n";
-                std::cout << "Inserisci il tuo nome: ";
-
-			  std::string inputLine;
-
-			  std::getline(std::cin >> std::ws, inputLine);
-
-			  playerName = inputLine;
-
-			  if (playerName.empty()) playerName = "Anonimo";
-
-			  std::cerr << "[DEBUG] Nome inserito: " << playerName << "\n";
-
-                ScoreManager::SaveScore(playerName, score);
-                std::cout << "Punteggio salvato!\n";*/
-                gameState = GameState::NAME_INPUT;
-            
+            endGame = true;
+            gameState = GameState::NAME_INPUT;
         }
-        else if (gameState == GameState::SCORES || gameState == GameState::INFO || gameState==GameState::PAUSED) {
-			scoreScrollOffset = 0.0f;
-
-            gameState = GameState::MENU;            
+        else if (gameState == GameState::SCORES || gameState == GameState::INFO || gameState == GameState::PAUSED) {
+            gameState = GameState::MENU;
         }
-        else if(gameState == GameState::MENU ) {
+        else if (gameState == GameState::MENU) {
             ingredients.clear();
-            //active = nullptr;
             endGame = false;
             glfwSetWindowShouldClose(window, true);
-		}
-	}
- 
-
-    // Rilascio ESC: sblocca il keyLock
+        }
+    }
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_RELEASE) {
         keys.keyLock[GLFW_KEY_ESCAPE] = false;
     }
-
-
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-	// make sure the viewport matches the new window dimensions; note that width and 
-	// height will be significantly larger than specified on retina displays.
-
-	if (width * screen.ARH > height * screen.ARW)
-	{
-		int viewport_width = (int)((double)height * screen.ARW / screen.ARH);
-		int padding = (width - viewport_width) / 2;
-		glViewport(0 + padding, 0, viewport_width, height);
-		//update scren values
-		screen.w = viewport_width;
-		screen.paddingW = padding;
-		screen.h = height;
-		screen.paddingH = 0;
-	}
-	else
-	{
-		int viewport_height = (int)((double)width * screen.ARH / screen.ARW);
-		int padding = (height - viewport_height) / 2;
-		glViewport(0, 0 + padding, width, viewport_height);
-		//update scren values
-		screen.w = width;
-		screen.paddingW = 0;
-		screen.h = viewport_height;
-		screen.paddingH = padding;
-
-	}
+void OnFramebufferSize(GLFWwindow* window, int width, int height) {
+    if (width * screen.ARH > height * screen.ARW) {
+        int viewport_width = (int)((double)height * screen.ARW / screen.ARH);
+        int padding = (width - viewport_width) / 2;
+        glViewport(padding, 0, viewport_width, height);
+        screen.w = viewport_width; screen.paddingW = padding;
+        screen.h = height;         screen.paddingH = 0;
+    } else {
+        int viewport_height = (int)((double)width * screen.ARH / screen.ARW);
+        int padding = (height - viewport_height) / 2;
+        glViewport(0, padding, width, viewport_height);
+        screen.w = width;          screen.paddingW = 0;
+        screen.h = viewport_height;screen.paddingH = padding;
+    }
 }
 
-float clampToUnitRange(float value) {
-	if (value < 0) return 0;
-	if (value > 1) return 1;
-	return value;
-}
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
+    float xpos = (float)xposIn;
+    float ypos = (float)yposIn;
 
-// glfw: whenever the mouse moves, this callback is called
-// -------------------------------------------------------
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
-{
-	float xpos = static_cast<float>(xposIn);
-	float ypos = static_cast<float>(yposIn);
+    float orthoX = xpos - screen.paddingW;
+    float orthoY = screen.h - (ypos - screen.paddingH);
+    mousePos = glm::vec2(orthoX, orthoY);
+    mouseScreenPos = glm::vec2(xpos, ypos);
 
-	float orthoX = xpos - screen.paddingW;
-	float orthoY = screen.h - (ypos - screen.paddingH);
-	mousePos = glm::vec2(orthoX, orthoY);
+    if (firstMouse) {
+        lastX = xpos; lastY = ypos; firstMouse = false;
+    }
 
-	mouseScreenPos = glm::vec2(xpos, ypos);
-	//std::cout << ptr->hit(glm::vec2(xpos, ypos), *p, *v) << std::endl;
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos;
+    lastX = xpos; lastY = ypos;
 
-	//printf("%f | %f\n", xval, yval);
-
-
-	//CAMERA MOVEMENT FUNCTION
-	if (firstMouse)
-	{
-		lastX = xpos;
-		lastY = ypos;
-		firstMouse = false;
-	}
-
-	float xoffset = xpos - lastX;
-	float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
-
-	lastX = xpos;
-	lastY = ypos;
-
-    if(glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED)
+    if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED)
         camera.ProcessMouseMovement(xoffset, yoffset);
-    
+
     if (isDragging) {
         if (mouseTrail.empty() || glm::distance(mouseTrail.back(), mousePos) > 3.0f) {
             mouseTrail.push_back(mousePos);
-            if (mouseTrail.size() > 25)
-                mouseTrail.erase(mouseTrail.begin());
+            if (mouseTrail.size() > 25) mouseTrail.erase(mouseTrail.begin());
         }
     }
-
 }
 
-// glfw: whenever the mouse scroll wheel scrolls, this callback is called
-// ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     if (gameState == GameState::SCORES) {
         // Rotellina GIU' (yoffset < 0) -> contenuto scende -> offset AUMENTA
