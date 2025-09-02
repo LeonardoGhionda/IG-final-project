@@ -4,6 +4,7 @@
 #include "shader.h"
 #include "vecplus.h"
 #include "screen.h"
+#include <GLFW/glfw3.h>
 
 //#define G glm::vec2(0.0f, -3.0f)
 #define G glm::vec2(0.0f, -6.0f)
