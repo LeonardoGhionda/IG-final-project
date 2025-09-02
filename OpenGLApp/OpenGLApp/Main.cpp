@@ -379,7 +379,7 @@ int main()
 	Shader objBlurShader("shader.vs", "shader_blur_objs.fs");
 	// load models
 	// -----------
-	Model backgroundPlane("resources/background/background.obj");
+	Model backgroundPlane("resources/background/table.obj");
 	Model playButtonModel("resources/buttons/playButton.obj");
 	Model scoresButtonModel("resources/buttons/scoresButton.obj");
 	Model infoButtonModel("resources/buttons/infoButton.obj");
