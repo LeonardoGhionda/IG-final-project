@@ -306,38 +306,49 @@ int main() {
         }
         else if (gameState == GameState::PLAYING) {
             const double now = glfwGetTime();
-
             blurShader.use();
+
             blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
 
-            // rettangolo non blur
+            // rettangolo non soggetto al blur 
+            //--------------------------------
             glm::vec2 rectSize = focusBox.getScaledSize() * 2.0f;
-            glm::vec2 rectPos  = focusBox.GetCenter();
-            rectSize.x /= screen.w; rectSize.y /= screen.h;
+            glm::vec2 rectPos = focusBox.GetCenter();
+            //normalizzazione della size  
+            rectSize.x /= screen.w;
+            rectSize.y /= screen.h;
+            //invert y 
             rectPos.y = 1 - rectPos.y;
-
-            float rectMinX = glm::max(0.0f, rectPos.x - rectSize.x * 0.5f);
-            float rectMinY = glm::max(0.0f, rectPos.y - rectSize.y * 0.5f);
-            float rectMaxX = glm::min(1.0f, rectPos.x + rectSize.x * 0.5f);
-            float rectMaxY = glm::min(1.0f, rectPos.y + rectSize.y * 0.5f);
+            //calcolo min
+            float rectMinX = rectPos.x - rectSize.x / 2.0f;
+            if (rectMinX < 0.0f) rectMinX = 0.0f;
+            float rectMinY = rectPos.y - rectSize.y / 2.0f;
+            if (rectMinY < 0.0f) rectMinY = 0.0f;
             blurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
+            //calcolo max
+            float rectMaxX = rectPos.x + rectSize.x / 2.0f;
+            if (rectMaxX > 1.0f) rectMaxX = 1.0f;
+            float rectMaxY = rectPos.y + rectSize.y / 2.0f;
+            if (rectMaxY > 1.0f) rectMaxY = 1.0f;
             blurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
+            //------------------------------------------------------------
 
             glDisable(GL_DEPTH_TEST);
 
-            // background (blur shader)
+            // Background
+            //-----------------
             glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
             blurShader.setMat4("projection", orthoProj);
             blurShader.setMat4("view", glm::mat4(1.0f));
+
 
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
             model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
             blurShader.setMat4("model", model);
-            blurShader.setBool("hasTexture", true);
-            blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+            blurShader.setBool("hasTexture", true);  // background ha texture
+            blurShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
             backgroundPlane.Draw(blurShader);
-
 
             // Ingredients
             //---------------
@@ -382,7 +393,7 @@ int main() {
                         if (!mouseTrail.empty() && camera.Zoom != 0.0f) {
                             // Se c'è una scia, processala
                             scoreManager.processSlash(
-                                mouseTrail, perspectiveProj, view, focusBox,
+                                mouseTrail, ingProj, ingView, focusBox,
                                 ingredients, activeCuts,
                                 screen,
                                 now,
@@ -421,79 +432,105 @@ int main() {
             }
 
             glDisable(GL_DEPTH_TEST);
-
-            // UI: vite
+            // --- UI pass: vite in alto a sinistra, senza depth test ---
             ourShader.use();
             glm::mat4 uiProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
             ourShader.setMat4("projection", uiProj);
             ourShader.setMat4("view", glm::mat4(1.0f));
             ourShader.setBool("hasTexture", true);
-            ourShader.setVec3("diffuseColor", glm::vec3(1));
+            ourShader.setVec3("diffuseColor", glm::vec3(1)); // colore fallback
 
-            const float padX = 60.0f, padY = 60.0f, iconSize = 28.0f, step = 80.0f;
+
+            const float padX = 60.0f;
+            const float padY = 60.0f;
+            const float iconSize = 28.0f;
+            const float step = 80.0f;
+
             for (int i = 0; i < scoreManager.getLives(); ++i) {
                 float x = padX + i * (iconSize + step);
                 float y = screen.h - padY;
+
                 glm::mat4 m(1.0f);
                 m = glm::translate(m, glm::vec3(x, y, 0.0f));
+                // Se il modello è centrato sull'origine, nessun offset extra:
                 m = glm::scale(m, glm::vec3(iconSize, iconSize, 1.0f));
+
+
                 ourShader.setMat4("model", m);
                 lifeIcon.Draw(ourShader);
             }
-
-            // Score UI
+            // Disegna lo score in alto a destra
             textShader.use();
             textShader.setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
+
             std::string scoreText = "Score: " + std::to_string(scoreManager.getScore());
             textRenderer.DrawText(textShader, scoreText, screen.w - 250.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
 
-            // trail durante drag + processo live
+
+
             if (isDragging && mouseTrail.size() >= 2) {
+                // 1. Disegna la scia del mouse
                 trailShader->use();
+
                 glm::mat4 proj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
                 trailShader->setMat4("projection", proj);
-                trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f));
+                trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f)); // giallo
 
                 std::vector<float> trailData;
-                trailData.reserve(mouseTrail.size() * 2);
-                for (const auto& pt : mouseTrail) { trailData.push_back(pt.x); trailData.push_back(pt.y); }
+                for (const auto& pt : mouseTrail) {
+                    trailData.push_back(pt.x);
+                    trailData.push_back(pt.y);
+                }
+
                 glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
                 glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * trailData.size(), trailData.data());
+
                 glBindVertexArray(trailVAO);
                 glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mouseTrail.size());
                 glBindVertexArray(0);
 
+                // 2. Processa il taglio sugli ingredienti
+                
                 scoreManager.processSlash(
-                    mouseTrail, perspectiveProj, view, focusBox,
+                    mouseTrail, ingProj, ingView, focusBox,
                     ingredients, activeCuts,
                     screen,
                     now,
                     gameState
                 );
+
             }
 
-            // disegna effetti taglio
+            // Disegna gli effetti di taglio (scia temporanea)
+            
             glLineWidth(4.0f);
             trailShader->use();
-            trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f));
+            trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f));  // bianco-giallo chiaro
             trailShader->setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
 
             std::vector<float> cutData;
-            for (auto it = activeCuts.begin(); it != activeCuts.end();) {
+            for (auto it = activeCuts.begin(); it != activeCuts.end(); ) {
                 double age = now - it->timestamp;
-                if (age > 0.2) { it = activeCuts.erase(it); continue; }
-                cutData.push_back(it->start.x); cutData.push_back(it->start.y);
-                cutData.push_back(it->end.x);   cutData.push_back(it->end.y);
+                if (age > 0.2) {
+                    it = activeCuts.erase(it);  // scade dopo 0.2s
+                    continue;
+                }
+                // aggiungi segmento alla linea
+                cutData.push_back(it->start.x);
+                cutData.push_back(it->start.y);
+                cutData.push_back(it->end.x);
+                cutData.push_back(it->end.y);
                 ++it;
             }
+
             if (!cutData.empty()) {
                 glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
                 glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * cutData.size(), cutData.data());
+
                 glBindVertexArray(trailVAO);
                 glDrawArrays(GL_LINES, 0, (GLsizei)(cutData.size() / 2));
                 glBindVertexArray(0);
             }
-
             glEnable(GL_DEPTH_TEST);
         }
         else if (gameState == GameState::SCORES) {
