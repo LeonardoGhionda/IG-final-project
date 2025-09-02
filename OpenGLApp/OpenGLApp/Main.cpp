@@ -101,7 +101,7 @@ bool customWindowShouldClose(GLFWwindow* window) {
 }
 
 void SpawnRandomIngredient() {
-    static const std::vector<std::string> allIngredients = {
+    std::vector<std::string> allIngredients = {
         "resources/ingredients/pumpkin/pumpkin.obj",
         "resources/ingredients/tomato/tomato.obj",
         "resources/ingredients/butter/butter.obj",
@@ -115,24 +115,15 @@ void SpawnRandomIngredient() {
          "resources/ingredients/vanilla/vanilla.obj",
          "resources/ingredients/apple/apple.obj",
          "resources/ingredients/strawberry/strawberry.obj",
-		 "resources/ingredients/lem_marcio/lim_marcio.obj",
-		 "resources/ingredients/apple_gold/mela_oro.obj",
-		  "resources/ingredients/choc_marcio/cioc_marcio.obj",
-		 "resources/ingredients/strawb_gold/fragola_oro.obj",
-       
-        // altri ingredienti qui
-        "resources/ingredients/chocolate/chocolate.obj",
-        "resources/ingredients/flour/flour.obj",
-        "resources/ingredients/eggs/eggs.obj",
-        "resources/ingredients/honey/honey.obj",
-        "resources/ingredients/lemon/lemon.obj",
-        "resources/ingredients/milk/milk.obj",
-        "resources/ingredients/jam/jam.obj",
-        "resources/ingredients/vanilla/vanilla.obj",
-        "resources/ingredients/apple/apple.obj",
-        "resources/ingredients/strawberry/strawberry.obj",
+         "resources/ingredients/lem_marcio/lim_marcio.obj",
+         "resources/ingredients/apple_gold/mela_oro.obj",
+          "resources/ingredients/choc_marcio/cioc_marcio.obj",
+         "resources/ingredients/strawb_gold/fragola_oro.obj",
+
+         // altri ingredienti qui
     };
 
+    int index = rand() % allIngredients.size();
     glm::vec2 spawn = Ingredient::RandomSpawnPoint();
 
     bool spawnBomb = (rand() % 100) < 20; // 20% bomba
@@ -140,21 +131,27 @@ void SpawnRandomIngredient() {
         ? "resources/ingredients/bomb/bomb.obj"
         : allIngredients[rand() % allIngredients.size()];
 
-    // Direzione verso l'alto/centro con piccola deviazione
-    glm::vec2 target(0.0f, screen.screenlimit.y * 0.5f);
+
+    // Direzione verso l'alto e centro, con piccola deviazione casuale
+    glm::vec2 target(screen.w * 0.5f, screen.h * 0.7f); // centro alto
     glm::vec2 dir = glm::normalize(target - spawn);
 
-    float angleOffset = ((rand() % 40) - 20) * 0.01745f; // ±20°
+
+    // ±12° per ridurre lo sbandamento laterale
+    float angleOffset = ((rand() % 24) - 12) * 0.01745f;
     dir = RotateVec2(dir, angleOffset);
 
-    float speed = 8.0f + static_cast<float>(rand() % 40) / 4.0f;
+    // spinta un po' più “verticale/arcata”
+    float speed = 600.0f + static_cast<float>(rand() % 100); // 600–699
 
-	float scale = 30.0f;
+    float scale = 30.0f;
 
     Ingredient item(path.c_str(), spawn, scale, spawnBomb);
     item.SetVelocity(dir * speed);
     item.updateTime();
     ingredients.push_back(item);
+
+
 }
 
 void character_callback(GLFWwindow* window, unsigned int codepoint) {
@@ -341,9 +338,14 @@ int main() {
             blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
             backgroundPlane.Draw(blurShader);
 
-            // ingredienti
+
+            // Ingredients
+            //---------------
+            glm::mat4 ingProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+            glm::mat4 ingView(1.0f);
             glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-            glm::mat4 view            = camera.GetViewMatrix();
+            glm::mat4 view = camera.GetViewMatrix();
+            model = glm::scale(model, glm::vec3(20.0f));  // per test visibilità
 
             spawnTimer += deltaTime;
             if (spawnTimer >= spawnInterval) {
@@ -351,49 +353,70 @@ int main() {
                 spawnTimer = 0.0f;
             }
 
+
+
             if (!ingredients.empty()) {
+
+
                 glEnable(GL_DEPTH_TEST);
                 ourShader.use();
-                ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-                ourShader.setBool("hasTexture", true);
+                ourShader.setVec3("diffuseColor", glm::vec3(1.0f));  // colore fallback bianco
+                ourShader.setBool("hasTexture", true);              // o false se vuoi colore puro
 
-                // input mouse -> trail
+
+                glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+                glm::mat4 view = camera.GetViewMatrix();
+
+                // Taglio con mouse trail
                 if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-                    if (!isDragging) { isDragging = true; mouseTrail.clear(); }
-                } else {
+                    if (!isDragging) {
+                        isDragging = true;
+                        mouseTrail.clear();
+                    }
+                }
+                else {
+
+
                     if (isDragging) {
                         isDragging = false;
                         if (!mouseTrail.empty() && camera.Zoom != 0.0f) {
+                            // Se c'è una scia, processala
                             scoreManager.processSlash(
                                 mouseTrail, perspectiveProj, view, focusBox,
                                 ingredients, activeCuts,
-                                screen,        // passa lo Screen reale
+                                screen,
                                 now,
                                 gameState
                             );
                         }
+
                         mouseTrail.clear();
                     }
                 }
 
-                // aggiorna/disegna ingredienti (con blur mask)
+                // Aggiorna e disegna tutti gli ingredienti
                 objBlurShader.use();
                 objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
-                objBlurShader.setMat4("projection", perspectiveProj);
-                objBlurShader.setMat4("view", view);
+                objBlurShader.setMat4("projection", ingProj);
+                objBlurShader.setMat4("view", ingView);
                 objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
                 objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
 
+                glDisable(GL_DEPTH_TEST);
                 for (auto& ing : ingredients) {
                     ing.Move();
+                    //texure height and width foer uTextelSize
                     Texture* t = ing.getFirstTexture();
                     if (t != nullptr) {
-                        objBlurShader.setVec2("uTexelSize", glm::vec2(1.0f / t->w, 1.0f / t->h));
+                        int tW = t->w;
+                        int tH = t->h;
+                        objBlurShader.setVec2("uTexelSize", glm::vec2(1.0f / tW, 1.0f / tH));
                     }
                     objBlurShader.setMat4("model", ing.GetModelMatrix());
                     objBlurShader.setBool("hasTexture", true);
                     objBlurShader.setVec3("diffuseColor", glm::vec3(1.0f));
                     ing.Draw(objBlurShader);
+
                 }
             }
 
