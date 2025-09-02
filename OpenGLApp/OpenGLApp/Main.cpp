@@ -69,6 +69,8 @@ bool isTypingName = false;
 
 bool fullscreen = false;
 
+float scoreScrollOffset = 0.0f;
+
 glm::vec2 mousePos = glm::vec2(0.0f);
 glm::vec2 mouseScreenPos = glm::vec2(0.0f);
 
