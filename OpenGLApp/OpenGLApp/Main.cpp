@@ -280,7 +280,34 @@ void processSlash(const std::vector<glm::vec2>& trail, const glm::mat4& projecti
         }
     }
 }
+// Crea i punti di un contorno rettangolare con angoli smussati
+static void buildRoundedRectOutline(float x, float y, float w, float h,
+    float r, int segs, std::vector<glm::vec2>& out)
+{
+    out.clear();
+    r = glm::clamp(r, 0.0f, 0.5f * glm::min(w, h));
 
+    auto arc = [&](float cx, float cy, float a0, float a1) {
+        for (int i = 0; i <= segs; ++i) {
+            float t = a0 + (a1 - a0) * (float)i / (float)segs;
+            out.emplace_back(cx + r * cosf(t), cy + r * sinf(t));
+        }
+        };
+
+    // coordinate schermo: (0,0) in basso a sinistra, Y verso l'alto
+    // angoli: 0 = +X, pi/2 = +Y, ...
+    // giriamo in senso antiorario partendo dal fondo-sx
+    // bottom-left (pi -> 3pi/2)
+    arc(x + r, y + r, glm::pi<float>(), 1.5f * glm::pi<float>());
+    // bottom-right (3pi/2 -> 2pi)
+    arc(x + w - r, y + r, 1.5f * glm::pi<float>(), 2.0f * glm::pi<float>());
+    // top-right (0 -> pi/2)
+    arc(x + w - r, y + h - r, 0.0f, 0.5f * glm::pi<float>());
+    // top-left (pi/2 -> pi)
+    arc(x + r, y + h - r, 0.5f * glm::pi<float>(), glm::pi<float>());
+    // chiudi la strip tornando al primo punto
+    out.push_back(out.front());
+}
 
 
 int main()
@@ -384,7 +411,8 @@ int main()
 	Model scoresButtonModel("resources/buttons/scoresButton.obj");
 	Model infoButtonModel("resources/buttons/infoButton.obj");
     Model lifeIcon("resources/ingredients/heart/heart.obj");
-
+	Model parchment("resources/recipes/pergamena.obj");
+   
 	glm::vec2 baseSize = glm::vec2(100.0f, 50.0f);
 	float spacing = 100.0f;
 
@@ -734,61 +762,184 @@ int main()
 			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
 			ourShader.setMat4("model", model);
 			ourShader.setBool("hasTexture", true);  // background ha texture
-			ourShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
+			ourShader.setVec3("diffuseColor", glm::vec3(2.0f)); // fallback nel caso
 			backgroundPlane.Draw(ourShader);
 			
+			// 1) Posizionamento pergamena
+	
+            // 0) stato GL sicuro
+            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_CULL_FACE);                 // evita scomparse per winding
+            
+            ourShader.use();
+            orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+            ourShader.setMat4("projection", orthoProj);
+            ourShader.setMat4("view", glm::mat4(1.0f));
 
-			ScoreManager manager;
-			auto scores = manager.LoadScores("score.txt");
+			float pW = screen.w * 0.62f;
+			float pH = screen.h * 0.72f;
+			float pX = (screen.w - pW) * 0.5f;
+			float pY = (screen.h - pH) * 0.5f;
+            float kH = 0.27f;  
+            float kW = 0.3f;
+            glm::mat4 pm(1.0f);
+            pm = glm::translate(pm, glm::vec3(pX + pW * 0.5f, pY + pH * 0.5f, 0.0f));
+            pm = glm::scale(pm, glm::vec3(pW * kW, pH * kH, 1.0f));  // SCALA DELL’OBJ
+            ourShader.setMat4("model", pm);
 
-			textShader.use();
-			glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
-			textShader.setMat4("projection", projection);
-			float x = 100.0f;
-		
-			// Base Y sotto il titolo
-			float baseY = screen.h - 180.0f;
-			float y = baseY + scoreScrollOffset;
-			float lineHeight = 60.0f;
-			// Titolo classifica FISSO
-			textRenderer.DrawText(textShader, "HIGH SCORES", x, screen.h - 100.0f, 1.5f, glm::vec3(0.0f));
-			int index = 1;
-			for (const auto& entry : scores) {
-				glm::vec3 color;
-				switch (index) {
-				case 1: color = glm::vec3(1.0f, 0.84f, 0.0f); break;
-				case 2: color = glm::vec3(0.75f); break;
-				case 3: color = glm::vec3(0.8f, 0.5f, 0.2f); break;
-				default: color = glm::vec3(0.0f); break;
-				}
-
-				float upperLimit = screen.h - 120.0f; // bordo inferiore del titolo
-				float lowerLimit = 0.0f;
-				if (y + lineHeight > upperLimit) {
-					y += 10;
-					index++;
-					continue;
-				}
-				if (y < lowerLimit) { // troppo in basso (fuori schermo)
-					y += 10;
-					index++;
-					continue;
-				}
-
-
-				std::string line = std::to_string(index++) + ". " + entry.name + ": " + std::to_string(entry.score);
-				textRenderer.DrawText(textShader, line, x, y, 1.0f, color);
-				y -= lineHeight;
-			}
+            // vogliamo vedere la TEXTURE della pergamena (se l’OBJ/MTL la fornisce)
+            ourShader.setBool("hasTexture", true);
+            ourShader.setVec3("diffuseColor", glm::vec3(1.0f));  // nessun tint
+            parchment.Draw(ourShader);
+			
+            // ---------------------------
+            // 2) Area interna di scrittura
+            // ---------------------------
+             // Padding per stare dentro alla pergamena (regola a gusto)
+            float padL = 160.0f, padR = 90.0f, padT = 90.0f, padB = 60.0f;
+            float innerX = pX + padL;
+            float innerY = pY + padB;
+            float innerW = pW - (padL + padR);
+            float innerH = pH - (padT + padB);
 
 
+            // Header "Classifica" fisso dentro la pergamena
+            textShader.use();
+            textShader.setMat4("projection", orthoProj);
+            textRenderer.DrawText(textShader, "HIGH SCORE", innerX, innerY + innerH + 40.0f, 1.2f, glm::vec3(0.25f, 0.15f, 0.06f));
 
+            // Zona scrollabile: parte sotto il titolo
+            float headerH = 56.0f;               // altezza riservata al titolo dentro la pergamena
+            float listTop = innerY + innerH - headerH; // bordo superiore area lista
+
+            // ----- Bordo arrotondato intorno all'area lista -----
+            std::vector<glm::vec2> borderPts;
+
+            // leggero inset così non “tocca” il testo
+            float inset = 1.0f;
+            float bx = innerX + inset;
+            float by = innerY + inset;
+            float bw = innerW - 70.0f * inset;
+            float bh = (listTop - by) - 2.0f * inset;
+            
+            float listBottom = by;                 // bordo inferiore area lista
+
+            float radius = 22.0f;   // raggio angoli (tuning)
+            int   segments = 10;      // più alto = più liscio
+
+            buildRoundedRectOutline(bx, by, bw, bh, radius, segments, borderPts);
+
+            glEnable(GL_LINE_SMOOTH);
+            glLineWidth(3.0f);
+
+            // trailShader: lo stai già creando sopra; lo riutilizziamo come line-shader 2D
+            trailShader->use();
+            // proiezione ortho in pixel
+            trailShader->setMat4("projection", orthoProj);
+            // se il tuo mouseTrail.fs ha un uniform "color", imposta qui:
+            trailShader->setVec3("color", glm::vec3(0.22f, 0.12f, 0.05f)); // marrone scuro
+
+            glBindVertexArray(trailVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, borderPts.size() * sizeof(glm::vec2), borderPts.data());
+            glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)borderPts.size());
+            glBindVertexArray(0);
+
+            // ---------------------------------------
+            // 3) Scissor per CLIPPING dentro pergamena
+            //    (attenzione ai padding del viewport!)
+            // ---------------------------------------
+            glEnable(GL_SCISSOR_TEST);
+            int scX = (int)(innerX + screen.paddingW);
+            int scY = (int)(innerY + screen.paddingH);
+            int scW = (int)innerW;
+            int scH = (int)(listTop - listBottom);
+            glScissor(scX, scY, scW, scH);
+
+            // ---------------------------------------
+            // 4) Disegno della lista scrollabile
+            // ---------------------------------------
+            ScoreManager manager;
+            auto scores = manager.LoadScores("score.txt");
+
+            float rowH = 62.0f;
+            float xRank = innerX + 8.0f;
+            float xAvatar = xRank;
+            float avatarSize = 48.0f;
+            float xName = xAvatar + avatarSize + 12.0f;
+            float pillW = 110.0f;
+            float xScore = innerX + innerW - pillW - 50.0f;
+
+            // baseline della PRIMA riga (subito sotto listTop).
+            // NOTA direzione: con la formula qui sotto, se scoreScrollOffset aumenta, le righe SCENDONO.
+            float y = listTop - rowH + scoreScrollOffset;
+
+            int index = 1;
+            for (const auto& entry : scores) {
+                // (Ottimizzazione) salta righe completamente fuori dal clip verticale
+                if (y + rowH <= listBottom || y >= listTop) {
+                    y -= rowH;
+                    index++;
+                    continue;  // fuori dall'area: non disegniamo (ottimizzazione)
+                }
+                // Riga alternata chiara
+                ourShader.use();
+                ourShader.setMat4("projection", orthoProj);
+                ourShader.setMat4("view", glm::mat4(1.0f));
+                ourShader.setBool("hasTexture", false);
+                ourShader.setVec3("diffuseColor", (index % 2 == 0) ? glm::vec3(1.0f, 1.0f, 1.0f)
+                    : glm::vec3(0.98f, 0.96f, 0.92f));
+                
+                // Separatore 
+                float sepMargin = 180.0f;                  // <-- regola quanto "accorciare"
+                float sepW = bw;
+
+                glm::mat4 sm(1.0f);
+                sm = glm::translate(sm, glm::vec3(innerX + sepW, y + 2.0f, 0.0f));
+                sm = glm::scale(sm, glm::vec3(sepW, 2.0f, 1.0f));
+                ourShader.setMat4("model", sm);
+                ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+                backgroundPlane.Draw(ourShader);
+               
+                textRenderer.DrawText(textShader, std::to_string(index), xRank + 30 , y + 18.0f, 0.9f, glm::vec3(0.12f, 0.08f, 0.06f));
+
+             
+                // Nome
+                textRenderer.DrawText(textShader, entry.name, xName+70, y + 20.0f, 0.95f, glm::vec3(0.12f, 0.08f, 0.06f));
+
+                //Score
+                textRenderer.DrawText(textShader, std::to_string(entry.score), xScore  , y + 20.0f, 1.0f, glm::vec3(1.0f));
+
+                y -= rowH; // riga successiva
+                index++;
+            }
+            glDisable(GL_SCISSOR_TEST);
+
+           
+            if (textRenderer.Characters.empty()) {
+                std::cerr << "Font non inizializzato!\n";
+                continue;
+            }
 
 		}
 		else if (gameState == GameState::NAME_INPUT) {
 			glDisable(GL_DEPTH_TEST);
 			textShader.use();
+            ourShader.use();
+            ////////////////////////
 
+            glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+            ourShader.setMat4("projection", orthoProj);
+            ourShader.setMat4("view", glm::mat4(1.0f));
+
+            // Background
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			ourShader.setMat4("model", model);
+			ourShader.setBool("hasTexture", true);  // background ha texture
+			ourShader.setVec3("diffuseColor", glm::vec3(2.0f)); // fallback nel caso
+			backgroundPlane.Draw(ourShader);
 			// Titolo
 			textRenderer.DrawText(textShader, "INSERISCI NOME:", screen.w / 3, screen.h / 2 + 50, 1.0f, glm::vec3(1.0f));
 
@@ -1072,18 +1223,26 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-	if (gameState == GameState::SCORES) {
-		// ROTELLINA GIÙ (yoffset < 0) → scrollOffset aumenta → righe vanno su
-		scoreScrollOffset -= static_cast<float>(-yoffset) * 30.0f;
+    if (gameState == GameState::SCORES) {
+        // Rotellina GIU' (yoffset < 0) -> contenuto scende -> offset AUMENTA
+        scoreScrollOffset -= (float)yoffset * 30.0f;
 
-		// Calcolo max scroll dinamico in base all'altezza visibile
-		int numEntries = ScoreManager::LoadScores("score.txt").size();
-		float lineHeight = 40.0f;
-		float visibleHeight = screen.h - 180.0f; // altezza visibile sotto il titolo
+        // Clamp dinamico: totale righe - area visibile pergamena
+        ScoreManager manager;
+        auto scores = manager.LoadScores("score.txt");
 
-		float maxScroll = glm::max(0.0f, numEntries * lineHeight - visibleHeight);
-		scoreScrollOffset = glm::clamp(scoreScrollOffset, 0.0f, maxScroll);
-	}
+        float rowH = 62.0f;
+        float total = (float)scores.size() * rowH;
+
+        // Deve combaciare con l'innerH - headerH usati nel render
+        float pH = screen.h * 0.72f;
+        float padT = 90.0f, padB = 60.0f, headerH = 56.0f;
+        float visible = (pH - (padT + padB)) - headerH;
+
+        float maxScroll = glm::max(0.0f, total - visible);
+        scoreScrollOffset = glm::clamp(scoreScrollOffset, 0.0f, maxScroll);
+    }
 }
+
 
 
