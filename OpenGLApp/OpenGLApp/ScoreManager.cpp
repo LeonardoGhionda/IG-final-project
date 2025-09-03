@@ -82,8 +82,23 @@ void ScoreManager::processSlash(const std::vector<glm::vec2>& trail,
             const size_t idx = static_cast<size_t>(std::distance(ingredients.begin(), it));
             const std::string id = (idx < ingredientIds.size()) ? ingredientIds[idx] : std::string{};
 
+            // --- REGOLE DI PUNTEGGIO/VITE ---
             if (it->IsBomb()) {
+                // Bomba: vita -1 ovunque
                 loseLife(1, gameState);
+            }
+            else if (id == "lim_marcio" || id == "cioc_marcio") {
+                // Marci: -2 SEMPRE (anche fuori focus)
+                addScore(-2);
+            }
+            else if (id == "mela_oro" || id == "fragola_oro") {
+                // Oro: +3 SOLO se in focus, altrimenti -1
+                if (inFocus) addScore(+3);
+                else addScore(-1);
+            }
+            else if (id == "heart") {
+                // Cuore: +1 vita SOLO se in focus, altrimenti nessun effetto
+                if (inFocus) addLife(1);  // clamp interno a MAX_LIVES
             } else {
                 if (inFocus) {
                     if (isRequiredId(id)) {

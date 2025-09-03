@@ -194,12 +194,19 @@ void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
         "resources/ingredients/bomb/bomb.obj", "bomb", 30.0f, true
     };
 
+	static const SpawnDef kHeart = {
+		"resources/ingredients/heart/heart.obj","heart", 28.0f, false
+	};
+
     // --- Scelta casuale tipo spawn ---
     std::uniform_int_distribution<int> perc(0, 99);
+	const bool spawnHeart = (perc(gen) < 8);  // ~8% cuore
     bool spawnBomb = (perc(gen) < 20);  // 20% bombe
 
     SpawnDef chosen;
-    if (spawnBomb) {
+    if (spawnHeart) {
+        chosen = kHeart;
+    } else if (spawnBomb) {
         chosen = kBomb;
     } else {
         std::uniform_int_distribution<size_t> pick(0, kNonBomb.size() - 1);

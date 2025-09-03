@@ -19,11 +19,16 @@ struct ScoreEntry {
 
 class ScoreManager {
 public:
+    static constexpr int MAX_LIVES = 3;
     explicit ScoreManager(int lives = 3) : m_score(0), m_lives(lives) {}
 
     void reset(int lives = 3) { m_score = 0; m_lives = lives; m_collected.clear(); }
     int  getScore() const { return m_score; }
     int  getLives() const { return m_lives; }
+
+    void addLife(int n = 1) {                           // <--- AGGIUNTO
+        m_lives = std::min(MAX_LIVES, m_lives + n);
+    }
 
     // --- NUOVO: definisci la ricetta (ID -> quantità)
     void setRequiredRecipe(const std::unordered_map<std::string,int>& req) {
