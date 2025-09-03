@@ -358,6 +358,7 @@ int main() {
 	Model infoButtonModel("resources/buttons/info.obj");
     Model lifeIcon("resources/ingredients/heart/heart.obj");
 	Model parchment("resources/recipes/pergamena.obj");
+	Model pauseModel("resources/levels/pause.obj");
 
 	std::vector<Model> recipeModels;
 	recipeModels.reserve(10);
@@ -1016,14 +1017,31 @@ int main() {
             }
         }
         else if (gameState == GameState::PAUSED) {
-            glDisable(GL_DEPTH_TEST);
-            textShader.use();
-            glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
-            textShader.setMat4("projection", projection);
-            textRenderer.DrawText(textShader, "GAME PAUSED",           screen.w / 2 - 150.0f, screen.h / 2,         1.5f, glm::vec3(1.0f, 0.5f, 0.0f));
-            textRenderer.DrawText(textShader, "Press P to RESUME",     screen.w / 2 - 200.0f, screen.h / 2 - 100.0f, 1.0f, glm::vec3(1.0f));
-            textRenderer.DrawText(textShader, "Press ESC to EXIT MENU",screen.w / 2 - 220.0f, screen.h / 2 - 150.0f, 1.0f, glm::vec3(1.0f));
-        }
+			glDisable(GL_DEPTH_TEST);
+
+			// Background come negli altri menu
+			ourShader.use();
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+			ourShader.setBool("hasTexture", true);
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+
+			glm::mat4 bg(1.0f);
+			bg = glm::translate(bg, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			bg = glm::scale(bg, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			ourShader.setMat4("model", bg);
+			backgroundPlane.Draw(ourShader);
+
+			// Modello di pausa centrato
+			glm::mat4 pm(1.0f);
+			pm = glm::translate(pm, glm::vec3(screen.w * 0.5f, screen.h * 0.5f, 0.0f));
+			float s = std::min(screen.w, screen.h) * 0.20f; // regola se serve più grande/piccolo
+			pm = glm::scale(pm, glm::vec3(s, s, 1.0f));
+			ourShader.setMat4("model", pm);
+			pauseModel.Draw(ourShader);
+		}
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();
