@@ -359,6 +359,7 @@ int main() {
     Model lifeIcon("resources/ingredients/heart/heart.obj");
 	Model parchment("resources/recipes/pergamena.obj");
 	Model pauseModel("resources/levels/pause.obj");
+	Model rulesModel("resources/recipes/rules.obj");
 
 	std::vector<Model> recipeModels;
 	recipeModels.reserve(10);
@@ -1040,6 +1041,40 @@ int main() {
 			pm = glm::scale(pm, glm::vec3(s, s, 1.0f));
 			ourShader.setMat4("model", pm);
 			pauseModel.Draw(ourShader);
+		}
+		else if (gameState == GameState::INFO) {
+			// Background uguale a PLAYING ma senza focus box
+			blurShader.use();
+			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			blurShader.setMat4("projection", orthoProj);
+			blurShader.setMat4("view", glm::mat4(1.0f));
+
+			glm::mat4 bg(1.0f);
+			bg = glm::translate(bg, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			bg = glm::scale(bg, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			blurShader.setMat4("model", bg);
+			blurShader.setBool("hasTexture", true);
+			blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+			backgroundPlane.Draw(blurShader);
+
+			// Modello delle regole centrato
+			glDisable(GL_DEPTH_TEST);
+			ourShader.use();
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+			ourShader.setBool("hasTexture", true);
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+
+			glm::mat4 m(1.0f);
+			m = glm::translate(m, glm::vec3(screen.w * 0.5f, screen.h * 0.5f, 0.0f));
+			float s = std::min(screen.w, screen.h) * 0.15f;   // regola se serve
+			m = glm::scale(m, glm::vec3(s, s, 1.0f));
+			ourShader.setMat4("model", m);
+
+			rulesModel.Draw(ourShader);
+			glEnable(GL_DEPTH_TEST);
 		}
 
 
