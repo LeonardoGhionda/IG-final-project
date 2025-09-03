@@ -56,14 +56,14 @@ bool firstMouse = true;
 
 Camera camera(CAMERA_POS);
 
-float focusSpeed = 0.3f;
+float focusSpeed = 0.8f;
 
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // spawn
-float spawnInterval = 2.0f;
+float spawnInterval = 1.2f;
 float spawnTimer = 0.0f;
 
 TextRenderer textRenderer;
@@ -107,60 +107,6 @@ bool customWindowShouldClose(GLFWwindow* window) {
     return glfwWindowShouldClose(window);
 }
 
-void SpawnRandomIngredient() {
-    std::vector<std::string> allIngredients = {
-        "resources/ingredients/pumpkin/pumpkin.obj",
-        "resources/ingredients/tomato/tomato.obj",
-        "resources/ingredients/butter/butter.obj",
-         "resources/ingredients/chocolate/chocolate.obj",
-         "resources/ingredients/flour/flour.obj",
-         "resources/ingredients/eggs/eggs.obj",
-         "resources/ingredients/honey/honey.obj",
-         "resources/ingredients/lemon/lemon.obj",
-         "resources/ingredients/milk/milk.obj",
-         "resources/ingredients/jam/jam.obj",
-         "resources/ingredients/vanilla/vanilla.obj",
-         "resources/ingredients/apple/apple.obj",
-         "resources/ingredients/strawberry/strawberry.obj",
-         "resources/ingredients/lem_marcio/lim_marcio.obj",
-         "resources/ingredients/apple_gold/mela_oro.obj",
-          "resources/ingredients/choc_marcio/cioc_marcio.obj",
-         "resources/ingredients/strawb_gold/fragola_oro.obj",
-
-         // altri ingredienti qui
-    };
-
-    int index = rand() % allIngredients.size();
-    glm::vec2 spawn = Ingredient::RandomSpawnPoint();
-
-    bool spawnBomb = (rand() % 100) < 20; // 20% bomba
-    std::string path = spawnBomb
-        ? "resources/ingredients/bomb/bomb.obj"
-        : allIngredients[rand() % allIngredients.size()];
-
-
-    // Direzione verso l'alto e centro, con piccola deviazione casuale
-    glm::vec2 target(screen.w * 0.5f, screen.h * 0.7f); // centro alto
-    glm::vec2 dir = glm::normalize(target - spawn);
-
-
-    // ±12° per ridurre lo sbandamento laterale
-    float angleOffset = ((rand() % 24) - 12) * 0.01745f;
-    dir = RotateVec2(dir, angleOffset);
-
-    // spinta un po' più “verticale/arcata”
-    float speed = 600.0f + static_cast<float>(rand() % 100); // 600–699
-
-    float scale = 30.0f;
-
-    Ingredient item(path.c_str(), spawn, scale, spawnBomb);
-    item.SetVelocity(dir * speed);
-    item.updateTime();
-    ingredients.push_back(item);
-
-
-}
-
 void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
                                  std::vector<std::string>& ingredientIds)
 {
@@ -171,7 +117,6 @@ void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
         bool isBomb = false;
     };
 
-    // Pool non-bomba (mappa ogni OBJ a un ID "logico")
     static const std::vector<SpawnDef> kNonBomb = {
         {"resources/ingredients/pumpkin/pumpkin.obj",        "pumpkin"},
         {"resources/ingredients/tomato/tomato.obj",          "tomato"},
@@ -192,59 +137,65 @@ void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
         {"resources/ingredients/strawb_gold/fragola_oro.obj","fragola_oro"},
     };
 
-    static const SpawnDef kBomb = {
-        "resources/ingredients/bomb/bomb.obj", "bomb", 30.0f, true
-    };
+    static const SpawnDef kBomb  = { "resources/ingredients/bomb/bomb.obj",  "bomb",  30.0f, true  };
+    static const SpawnDef kHeart = { "resources/ingredients/heart/heart.obj","heart", 28.0f, false };
 
-	static const SpawnDef kHeart = {
-		"resources/ingredients/heart/heart.obj","heart", 28.0f, false
-	};
+    // ------------------ difficoltà in base al livello ------------------
+    int currentLevel; 
+    const int lvl = std::max(1, currentLevel);
 
-    // --- Scelta casuale tipo spawn ---
-    std::uniform_int_distribution<int> perc(0, 99);
-	const bool spawnHeart = (perc(gen) < 10);  // ~8% cuore
-    bool spawnBomb = (perc(gen) < 20);  // 20% bombe
+    // Probabilità (percento)
+    const int heartPct = std::max(2, 5 - (lvl / 3));                 // 6% → 5% → ... → min 2%
+    const int bombPct  = std::min(38, 8 + 3 * (lvl - 1));           // 12% +2%/lvl → max 38%
+
+    // Scelta categoriale: prima cuore, poi bomba, altrimenti ingrediente
+    std::uniform_int_distribution<int> d100(0, 99);
+    int roll = d100(gen);
 
     SpawnDef chosen;
-    if (spawnHeart) {
+    if (roll < heartPct) {
         chosen = kHeart;
-    } else if (spawnBomb) {
+    } else if (roll < heartPct + bombPct) {
         chosen = kBomb;
     } else {
         std::uniform_int_distribution<size_t> pick(0, kNonBomb.size() - 1);
         chosen = kNonBomb[pick(gen)];
     }
 
-    // --- Spawn e fisica iniziale (coerente con la tua funzione) ---
-    glm::vec2 spawn = Ingredient::RandomSpawnPoint();
-
-    glm::vec2 target(screen.w * 0.5f, screen.h * 0.7f);    // verso alto-centro
+    // ------------------ spawn point e direzione ------------------
+    glm::vec2 spawn = Ingredient::RandomSpawnPoint(); // ora spawna dai 4 lati (come hai messo)
+    glm::vec2 target(screen.w * 0.5f, screen.h * 0.6f);
     glm::vec2 dir = glm::normalize(target - spawn);
 
     std::uniform_real_distribution<float> angleDeg(-12.0f, 12.0f);
     dir = RotateVec2(dir, glm::radians(angleDeg(gen)));
 
+    // ------------------ velocità con scala sul livello ------------------
     std::uniform_real_distribution<float> speedJit(600.0f, 700.0f);
-    float speed = speedJit(gen);
+    float speed = speedJit(gen) * (0.7f + 0.07f * (lvl - 1));        // +7% per livello
+    speed = std::min(speed, 1400.0f);                                // clamp di sicurezza
 
     Ingredient item(chosen.path, spawn, chosen.scale, chosen.isBomb);
     item.SetVelocity(dir * speed);
     item.updateTime();
 
     ingredients.emplace_back(std::move(item));
-    ingredientIds.emplace_back(chosen.id);   // <-- allinea l’ID al nuovo ingrediente
+    ingredientIds.emplace_back(chosen.id);
 }
 
 
 void character_callback(GLFWwindow* window, unsigned int codepoint) {
-    if (gameState == GameState::NAME_INPUT) {
-        if (codepoint == GLFW_KEY_BACKSPACE && !inputName.empty()) {
-            inputName.pop_back();
-        } else if (inputName.size() < 12 && codepoint >= 32 && codepoint <= 126) {
+    if (gameState != GameState::NAME_INPUT) return;
+
+    // Accetta solo caratteri stampabili ASCII
+    if (codepoint >= 32 && codepoint <= 126) {
+        if (inputName.size() < 10) {
             inputName += static_cast<char>(codepoint);
         }
     }
+    // Nota: niente gestione BACKSPACE qui; la fai già nel ramo NAME_INPUT
 }
+
 // Crea i punti di un contorno rettangolare con angoli smussati
 static void buildRoundedRectOutline(float x, float y, float w, float h,
     float r, int segs, std::vector<glm::vec2>& out)
@@ -391,16 +342,16 @@ int main() {
 	std::vector<std::string> recipeIds;
 
 	std::vector<std::unordered_map<std::string,int>> levelRecipes = {
-		{{"milk",1}, {"eggs",1}},                                  // 1
-		{{"flour",2}, {"milk",1}, {"eggs",1}},                     // 2
-		{{"tomato",3}},                                            // 3
-		{{"apple",2}, {"strawberry",2}},                           // 4
-		{{"vanilla",1}, {"honey",2}, {"milk",1}},                  // 5
-		{{"chocolate",2}, {"milk",1}},                             // 6
-		{{"butter",2}, {"flour",2}},                               // 7
-		{{"lemon",3}},                                             // 8
-		{{"apple",2}, {"eggs",1}},                                   // 9
-		{{"pumpkin",2}, {"flour",2}, {"eggs",1}, {"milk",1}}       // 10
+		{{"flour",2}, {"mil",3}, {"eggs",5}, {"lemon",1}, {"butter",2}, {"vanilla",1}},                                  // 1
+		{{"flour",2}, {"milk",2}, {"eggs",4}, {"apple",5}, {"butter",3}},                     // 2
+		{{"flour",2}, {"milk",1}, {"eggs",3}, {"strawberry",5}, {"jam",4}},                                            // 3
+		{{"pumpkin",2}, {"milk",3}, {"vanilla",1}, {"honey",4}},                           // 4
+		{{"milk",3}, {"lemon",5}, {"honey",4}},                  // 5
+		{{"chocolate",4}, {"eggs",2}, {"butter",4}, {"flour",3}},                             // 6
+		{{"strawberry",4}, {"lemon",3}, {"apple",2}, {"honey",2}},                               // 7
+		{{"chocolate",2}, {"milk",3}, {"flour",3}, {"eggs",2}},                                             // 8
+		{{"milk",3}, {"chocolate",3}, {"strawberry",4}},                                   // 9
+		{{"chocolate",3}, {"vanilla",3}, {"pumpkin",4}, {"eggs",3}}       // 10
 	};
 
 	auto applyLevel = [&](int lvl){
@@ -526,8 +477,8 @@ int main() {
 			textShader.setMat4("projection", orthoProj);
 			int remaining = (int)std::ceil(kRecipePreview - (now - recipeStartTime));
 			if (remaining < 0) remaining = 0;
-			textRenderer.DrawText(textShader, "Time: " + std::to_string(remaining),
-								screen.w - 220.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
+			textRenderer.DrawText(textShader, std::to_string(remaining),
+								screen.w - 70.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
 
 			// dopo 3s vai a PLAYING
 			if (now - recipeStartTime >= kRecipePreview) {
@@ -661,14 +612,14 @@ int main() {
 
 			textShader.use();
 			textShader.setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
-			std::string scoreText = "Score: " + std::to_string(scoreManager.getScore());
+			std::string scoreText = "SCORE " + std::to_string(scoreManager.getScore());
 			textRenderer.DrawText(textShader, scoreText, screen.w - 250.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
 			
 			// --- Lista ingredienti richiesti con quantità rimanente, sotto "Score" ---
 			{
-				const float startX = screen.w - 250.0f;   // allinea con lo "Score"
-				float y = screen.h - 100.0f;              // un po' sotto la riga dello score
-				const float lineStep = 28.0f;             // distanza tra righe
+				const float startX = screen.w - 180.0f;   // allinea con lo "Score"
+				float y = screen.h - 110.0f;              // un po' sotto la riga dello score
+				const float lineStep = 30.0f;             // distanza tra righe
 
 				for (const auto& id : recipeIds) {
 					int req = scoreManager.getRequiredQty(id);
@@ -680,7 +631,7 @@ int main() {
 
 					// es. "latte x1"
 					std::string line = id + " x" + std::to_string(rem);
-					textRenderer.DrawText(textShader, line, startX, y, 0.9f, col);
+					textRenderer.DrawText(textShader, line, startX, y, 0.5f, col);
 					y -= lineStep;
 				}
 			}
@@ -855,10 +806,31 @@ int main() {
             float innerH = pH - (padT + padB);
 
 
-            // Header "Classifica" fisso dentro la pergamena
-            textShader.use();
-            textShader.setMat4("projection", orthoProj);
-            textRenderer.DrawText(textShader, "HIGH SCORE", innerX, innerY + innerH + 40.0f, 1.2f, glm::vec3(0.25f, 0.15f, 0.06f));
+            // Helper per misurare la larghezza del testo (in px)
+			auto textWidthPx = [&](const std::string& s, float scale) {
+				float w = 0.0f;
+				for (char c : s) {
+					auto it = textRenderer.Characters.find(c);
+					if (it != textRenderer.Characters.end())
+						w += (it->second.Advance >> 6) * scale; // Advance è in 1/64 px
+				}
+				return w;
+			};
+
+			textShader.use();
+			textShader.setMat4("projection", orthoProj);
+
+			const float headerScale = 1.2f;
+			const std::string header = "HIGH SCORE";
+
+			// X centrata rispetto allo schermo
+			float headerX = (screen.w - textWidthPx(header, headerScale)) * 0.5f;
+			// Y dove lo avevi (sopra l’area lista)
+			float headerY = innerY + innerH + 40.0f;
+
+			textRenderer.DrawText(textShader, header, headerX, headerY, headerScale,
+								glm::vec3(0.25f, 0.15f, 0.06f));
+
 
             // Zona scrollabile: parte sotto il titolo
             float headerH = 56.0f;               // altezza riservata al titolo dentro la pergamena
@@ -992,11 +964,41 @@ int main() {
 			ourShader.setBool("hasTexture", true);  // background ha texture
 			ourShader.setVec3("diffuseColor", glm::vec3(2.0f)); // fallback nel caso
 			backgroundPlane.Draw(ourShader);
-			// Titolo
-			textRenderer.DrawText(textShader, "INSERISCI NOME:", screen.w / 3, screen.h / 2 + 50, 1.0f, glm::vec3(1.0f));
 
-			// Mostra testo digitato
-			textRenderer.DrawText(textShader, inputName + "_", screen.w / 3, screen.h / 2, 1.0f, glm::vec3(0.5f, 1.0f, 0.5f));
+			// Titolo + input centrati orizzontalmente
+			textShader.use();
+			textShader.setMat4("projection", orthoProj);
+
+			// Helper per misurare la larghezza del testo in pixel (usa l'Advance dei glifi)
+			auto textWidthPx = [&](const std::string& s, float scale) -> float {
+				float w = 0.0f;
+				for (char c : s) {
+					auto it = textRenderer.Characters.find(c);
+					if (it != textRenderer.Characters.end()) {
+						w += (it->second.Advance >> 6) * scale; // Advance è in 1/64 px
+					}
+				}
+				return w;
+			};
+
+			const float titleScale = 1.0f;
+			const float inputScale = 1.0f;
+
+			std::string title = "INSERISCI NOME:";
+			std::string input = inputName + "_";
+
+			// X centrata: (larghezza schermo - larghezza testo)/2
+			float titleX = (screen.w - textWidthPx(title, titleScale)) * 0.5f;
+			float inputX = (screen.w - textWidthPx(input, inputScale)) * 0.5f;
+
+			// Y: due righe attorno al centro dello schermo (leggermente separate)
+			float centerY = screen.h * 0.5f;
+			float titleY  = centerY + 40.0f;  // sopra al centro
+			float inputY  = centerY - 10.0f;  // sotto al centro
+
+			textRenderer.DrawText(textShader, title, titleX, titleY, titleScale, glm::vec3(1.0f));
+			textRenderer.DrawText(textShader, input, inputX, inputY, inputScale, glm::vec3(0.5f, 1.0f, 0.5f));
+
 
             // BACKSPACE con delay
             if (glfwGetKey(window, GLFW_KEY_BACKSPACE) == GLFW_PRESS && !inputName.empty()) {
