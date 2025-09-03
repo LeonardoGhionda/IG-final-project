@@ -11,6 +11,7 @@
 #include <random>
 #include <limits>
 #include <vector>
+#include <unordered_map>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -200,7 +201,7 @@ void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
 
     // --- Scelta casuale tipo spawn ---
     std::uniform_int_distribution<int> perc(0, 99);
-	const bool spawnHeart = (perc(gen) < 8);  // ~8% cuore
+	const bool spawnHeart = (perc(gen) < 10);  // ~8% cuore
     bool spawnBomb = (perc(gen) < 20);  // 20% bombe
 
     SpawnDef chosen;
@@ -356,18 +357,46 @@ int main() {
 	Model infoButtonModel("resources/buttons/infoButton.obj");
     Model lifeIcon("resources/ingredients/heart/heart.obj");
 	Model parchment("resources/recipes/pergamena.obj");
-	Model recipeModel("resources/recipes/ricetta1.obj");   // <--- carica il modello ricetta
+
+	std::vector<Model> recipeModels;
+	recipeModels.reserve(10);
+	for (int i = 1; i <= 10; ++i) {
+		recipeModels.emplace_back(("resources/recipes/ricetta" + std::to_string(i) + ".obj").c_str());
+	}
 
 	// durata anteprima ricetta
-	constexpr double kRecipePreview = 10.0;   // 3 secondi
+	constexpr double kRecipePreview = 10.0;  
+	constexpr double kCongratsTime  = 5.0;
 
 	// timestamp inizio stato RECIPE
+	int currentLevel = 1;
 	double recipeStartTime = 0.0;
+	double congratsStartTime = 0.0;
 
 
 	// vettore parallelo agli ingredienti per tenerne l'ID
 	std::vector<std::string> ingredientIds;                 // <--- AGGIUNTO
 	std::vector<std::string> recipeIds;
+
+	std::vector<std::unordered_map<std::string,int>> levelRecipes = {
+		{{"milk",1}, {"eggs",1}},                                  // 1
+		{{"flour",2}, {"milk",1}, {"eggs",1}},                     // 2
+		{{"tomato",3}},                                            // 3
+		{{"apple",2}, {"strawberry",2}},                           // 4
+		{{"vanilla",1}, {"honey",2}, {"milk",1}},                  // 5
+		{{"chocolate",2}, {"milk",1}},                             // 6
+		{{"butter",2}, {"flour",2}},                               // 7
+		{{"lemon",3}},                                             // 8
+		{{"apple",2}, {"eggs",1}},                                   // 9
+		{{"pumpkin",2}, {"flour",2}, {"eggs",1}, {"milk",1}}       // 10
+	};
+
+	auto applyLevel = [&](int lvl){
+		scoreManager.setRequiredRecipe(levelRecipes[lvl-1]);
+		recipeIds.clear();
+		for (auto &kv : levelRecipes[lvl-1]) recipeIds.push_back(kv.first);
+	}; 
+
    
 	glm::vec2 baseSize = glm::vec2(100.0f, 50.0f);
 	float spacing = 100.0f;
@@ -421,19 +450,11 @@ int main() {
                 spawnTimer = 0.0f;
                 scoreManager.reset(3);           // reset punteggio e vite
 
-				// Definisci la ricetta: ID -> quantità (ID a tua scelta)
-				scoreManager.setRequiredRecipe({
-					{"milk", 1},
-					{"eggs", 1}
-				});
-
-				// L’ordine dei nomi da mostrare sotto "Score"
-				recipeIds = { "milk", "eggs" };
-
+				currentLevel = 1;
+				applyLevel(currentLevel);
 
                 // Avvia stato RECIPE (3s)
 				recipeStartTime = glfwGetTime();
-				spawnTimer = 0.0f;                  // riparti pulito quando entrerai in PLAYING
 				gameState = GameState::RECIPE;
 				glEnable(GL_DEPTH_TEST);
 				continue;
@@ -479,7 +500,7 @@ int main() {
 			float s = std::min(screen.w, screen.h) * 0.18f;
 			rm = glm::scale(rm, glm::vec3(s, s, 1.0f));
 			ourShader.setMat4("model", rm);
-			recipeModel.Draw(ourShader);
+			recipeModels[currentLevel-1].Draw(ourShader);
 
 			// countdown in alto a destra
 			textShader.use();
@@ -691,6 +712,60 @@ int main() {
 			}
 
 			glEnable(GL_DEPTH_TEST);
+		}
+
+		else if (gameState == GameState::CONGRATULATIONS) {
+			const double now = glfwGetTime();
+
+			// background (riusa quello di PLAYING)
+			blurShader.use();
+			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			blurShader.setMat4("projection", orthoProj);
+			blurShader.setMat4("view", glm::mat4(1.0f));
+
+			glm::mat4 model(1.0f);
+			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			blurShader.setMat4("model", model);
+			blurShader.setBool("hasTexture", true);
+			blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+			backgroundPlane.Draw(blurShader);
+
+			// Testo centrale: "Livello X completato"
+			glDisable(GL_DEPTH_TEST);
+			textShader.use();
+			textShader.setMat4("projection", orthoProj);
+
+			std::string msg = "Livello " + std::to_string(currentLevel) + " completato";
+			// centra “a occhio”
+			textRenderer.DrawText(textShader, msg,
+				screen.w * 0.5f - 220.0f, screen.h * 0.5f, 1.3f, glm::vec3(1.0f, 1.0f, 0.4f));
+
+			// entra in congrats al primo frame
+			if (congratsStartTime == 0.0) congratsStartTime = now;
+
+			// dopo 5s, passa al livello successivo o a NAME_INPUT
+			if (now - congratsStartTime >= kCongratsTime) {
+				congratsStartTime = 0.0;
+				if (currentLevel >= 10) {
+					// ultimo livello finito -> fine partita
+					gameState = GameState::NAME_INPUT;
+				} else {
+					// livello successivo
+					++currentLevel;
+					applyLevel(currentLevel);
+
+					// pulisci e vai a mostrare la nuova ricetta
+					ingredients.clear();
+					ingredientIds.clear();
+					activeCuts.clear();
+					spawnTimer = 0.0f;
+
+					recipeStartTime = glfwGetTime();
+					gameState = GameState::RECIPE;
+				}
+			}
 		}
 
         else if (gameState == GameState::SCORES) {

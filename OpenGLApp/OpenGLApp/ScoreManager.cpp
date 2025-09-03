@@ -106,7 +106,7 @@ void ScoreManager::processSlash(const std::vector<glm::vec2>& trail,
                         int& c = m_collected[id];
                         if (c < getRequiredQty(id)) c++;
                         if (isRecipeComplete()) {
-                            gameState = GameState::NAME_INPUT;
+                            gameState = GameState::CONGRATULATIONS;
                         }
                     } else {
                         addScore(-1);
