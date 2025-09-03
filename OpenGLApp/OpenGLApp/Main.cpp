@@ -12,6 +12,7 @@
 #include <limits>
 #include <vector>
 #include <unordered_map>
+#include <memory>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -352,9 +353,9 @@ int main() {
 	// load models
 	// -----------
 	Model backgroundPlane("resources/background/table.obj");
-	Model playButtonModel("resources/buttons/playButton.obj");
-	Model scoresButtonModel("resources/buttons/scoresButton.obj");
-	Model infoButtonModel("resources/buttons/infoButton.obj");
+	Model playButtonModel("resources/buttons/play.obj");
+	Model scoresButtonModel("resources/buttons/scores.obj");
+	Model infoButtonModel("resources/buttons/info.obj");
     Model lifeIcon("resources/ingredients/heart/heart.obj");
 	Model parchment("resources/recipes/pergamena.obj");
 
@@ -363,6 +364,15 @@ int main() {
 	for (int i = 1; i <= 10; ++i) {
 		recipeModels.emplace_back(("resources/recipes/ricetta" + std::to_string(i) + ".obj").c_str());
 	}
+
+	// Modelli "Livello X completato"
+	std::vector<std::unique_ptr<Model>> levelModels;
+	levelModels.reserve(10);
+	for (int i = 1; i <= 10; ++i) {
+		std::string p = "resources/levels/livello" + std::to_string(i) + ".obj";
+		levelModels.emplace_back(std::make_unique<Model>(p.c_str()));
+	}
+
 
 	// durata anteprima ricetta
 	constexpr double kRecipePreview = 10.0;  
@@ -401,9 +411,9 @@ int main() {
 	glm::vec2 baseSize = glm::vec2(100.0f, 50.0f);
 	float spacing = 100.0f;
 
-	float playYScale = 1.0f;
-	float scoresYScale = 1.0f;
-	float infoYScale = 1.0f;
+	float playYScale = 2.0f;
+	float scoresYScale = 2.0f;
+	float infoYScale = 2.0f;
 
     Button playButton{  glm::vec2(0.5f, 0.75f), baseSize, playYScale,   "PLAY"   };
     Button scoresButton{glm::vec2(0.5f, 0.50f), baseSize, scoresYScale, "SCORES" };
@@ -436,6 +446,11 @@ int main() {
             ourShader.setBool("hasTexture", true);
             ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
             backgroundPlane.Draw(ourShader);
+
+			//aggiorna hover
+			playButton.UpdateHover(mousePos);
+			scoresButton.UpdateHover(mousePos);
+			infoButton.UpdateHover(mousePos);
 
             // bottoni
             ourShader.setBool("hasTexture", false);
@@ -474,6 +489,8 @@ int main() {
 			blurShader.use();
 			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
 
+			blurShader.setVec2("rectMin", glm::vec2(-1.0f, -1.0f));
+    		blurShader.setVec2("rectMax", glm::vec2(-1.0f, -1.0f));
 			// se usi il focus blur anche qui, ripeti il setup del rect (facoltativo)
 			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
 			blurShader.setMat4("projection", orthoProj);
@@ -720,6 +737,10 @@ int main() {
 			// background (riusa quello di PLAYING)
 			blurShader.use();
 			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+			
+			blurShader.setVec2("rectMin", glm::vec2(-1.0f, -1.0f));
+            blurShader.setVec2("rectMax", glm::vec2(-1.0f, -1.0f));
+			
 			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
 			blurShader.setMat4("projection", orthoProj);
 			blurShader.setMat4("view", glm::mat4(1.0f));
@@ -732,15 +753,24 @@ int main() {
 			blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
 			backgroundPlane.Draw(blurShader);
 
-			// Testo centrale: "Livello X completato"
+			// Mostra il modello del livello corrente (niente testo)
 			glDisable(GL_DEPTH_TEST);
-			textShader.use();
-			textShader.setMat4("projection", orthoProj);
+			ourShader.use();
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+			ourShader.setBool("hasTexture", true);
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
 
-			std::string msg = "Livello " + std::to_string(currentLevel) + " completato";
-			// centra “a occhio”
-			textRenderer.DrawText(textShader, msg,
-				screen.w * 0.5f - 220.0f, screen.h * 0.5f, 1.3f, glm::vec3(1.0f, 1.0f, 0.4f));
+			glm::mat4 lm(1.0f);
+			lm = glm::translate(lm, glm::vec3(screen.w * 0.5f, screen.h * 0.5f, 0.0f));
+			float s = std::min(screen.w, screen.h) * 0.20f; // scala “comoda”, regola se serve
+			lm = glm::scale(lm, glm::vec3(s, s, 1.0f));
+			ourShader.setMat4("model", lm);
+
+			// Disegna "resources/levels/livelloX.obj"
+			if (currentLevel >= 1 && currentLevel <= (int)levelModels.size()) {
+				levelModels[currentLevel - 1]->Draw(ourShader);
+			}
 
 			// entra in congrats al primo frame
 			if (congratsStartTime == 0.0) congratsStartTime = now;
@@ -749,14 +779,11 @@ int main() {
 			if (now - congratsStartTime >= kCongratsTime) {
 				congratsStartTime = 0.0;
 				if (currentLevel >= 10) {
-					// ultimo livello finito -> fine partita
-					gameState = GameState::NAME_INPUT;
+					gameState = GameState::NAME_INPUT; // ultimo livello completato
 				} else {
-					// livello successivo
 					++currentLevel;
 					applyLevel(currentLevel);
 
-					// pulisci e vai a mostrare la nuova ricetta
 					ingredients.clear();
 					ingredientIds.clear();
 					activeCuts.clear();
@@ -767,6 +794,7 @@ int main() {
 				}
 			}
 		}
+
 
         else if (gameState == GameState::SCORES) {
 			
