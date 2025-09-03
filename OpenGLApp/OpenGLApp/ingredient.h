@@ -119,16 +119,27 @@ public:
         bool hit =  glm::distance(mousePos, pos) <= CHB_MCS(projection, view)*1.5f;
         return hit;
     }
-    static glm::vec2 RandomSpawnPoint() {
-        std::random_device rd;
-        std::mt19937 gen(rd());
+    static glm::vec2 RandomSpawnPoint(float margin = 60.0f) {
+        // RNG persistente (evita di reinizializzarlo ad ogni chiamata)
+        static thread_local std::mt19937 gen(std::random_device{}());
 
-        std::uniform_real_distribution<float> distX(0.1f, 0.9f); // da 10% a 90% larghezza schermo
-        float x = distX(gen) * screen.w;
-        float y = -50.0f; // un po' sotto lo schermo (in pixel)
+        // Lato di spawn: 0=sinistra, 1=destra, 2=basso, 3=alto
+        std::uniform_int_distribution<int> side(0, 3);
+        std::uniform_real_distribution<float> rx(0.0f, (float)screen.w);
+        std::uniform_real_distribution<float> ry(0.0f, (float)screen.h);
 
-        return glm::vec2(x, y);
+        switch (side(gen)) {
+            case 0:  // sinistra
+                return glm::vec2(-margin, ry(gen));
+            case 1:  // destra
+                return glm::vec2(screen.w + margin, ry(gen));
+            case 2:  // basso
+                return glm::vec2(rx(gen), -margin);
+            default: // alto
+                return glm::vec2(rx(gen), screen.h + margin);
+        }
     }
+
 
 
 

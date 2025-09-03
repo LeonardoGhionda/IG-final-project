@@ -11,6 +11,8 @@
 #include <random>
 #include <limits>
 #include <vector>
+#include <unordered_map>
+#include <memory>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -39,6 +41,9 @@ void processInput(GLFWwindow* window, FocusBox& focusBox);
 void character_callback(GLFWwindow* window, unsigned int codepoint);
 bool customWindowShouldClose(GLFWwindow* window);
 void SpawnRandomIngredient();
+void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
+                                 std::vector<std::string>& ingredientIds);
+
 
 // -----------------------------------------------------------------------------
 // Stato globale (ordinato: prima Screen, poi variabili che lo usano)
@@ -51,14 +56,14 @@ bool firstMouse = true;
 
 Camera camera(CAMERA_POS);
 
-float focusSpeed = 0.3f;
+float focusSpeed = 0.8f;
 
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // spawn
-float spawnInterval = 2.0f;
+float spawnInterval = 1.2f;
 float spawnTimer = 0.0f;
 
 TextRenderer textRenderer;
@@ -102,69 +107,95 @@ bool customWindowShouldClose(GLFWwindow* window) {
     return glfwWindowShouldClose(window);
 }
 
-void SpawnRandomIngredient() {
-    std::vector<std::string> allIngredients = {
-        "resources/ingredients/pumpkin/pumpkin.obj",
-        "resources/ingredients/tomato/tomato.obj",
-        "resources/ingredients/butter/butter.obj",
-         "resources/ingredients/chocolate/chocolate.obj",
-         "resources/ingredients/flour/flour.obj",
-         "resources/ingredients/eggs/eggs.obj",
-         "resources/ingredients/honey/honey.obj",
-         "resources/ingredients/lemon/lemon.obj",
-         "resources/ingredients/milk/milk.obj",
-         "resources/ingredients/jam/jam.obj",
-         "resources/ingredients/vanilla/vanilla.obj",
-         "resources/ingredients/apple/apple.obj",
-         "resources/ingredients/strawberry/strawberry.obj",
-         "resources/ingredients/lem_marcio/lim_marcio.obj",
-         "resources/ingredients/apple_gold/mela_oro.obj",
-          "resources/ingredients/choc_marcio/cioc_marcio.obj",
-         "resources/ingredients/strawb_gold/fragola_oro.obj",
-
-         // altri ingredienti qui
+void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
+                                 std::vector<std::string>& ingredientIds)
+{
+    struct SpawnDef {
+        const char* path;
+        const char* id;
+        float scale = 30.0f;
+        bool isBomb = false;
     };
 
-    int index = rand() % allIngredients.size();
-    glm::vec2 spawn = Ingredient::RandomSpawnPoint();
+    static const std::vector<SpawnDef> kNonBomb = {
+        {"resources/ingredients/pumpkin/pumpkin.obj",        "pumpkin"},
+        {"resources/ingredients/tomato/tomato.obj",          "tomato"},
+        {"resources/ingredients/butter/butter.obj",          "butter"},
+        {"resources/ingredients/chocolate/chocolate.obj",    "chocolate"},
+        {"resources/ingredients/flour/flour.obj",            "flour"},
+        {"resources/ingredients/eggs/eggs.obj",              "eggs"},
+        {"resources/ingredients/honey/honey.obj",            "honey"},
+        {"resources/ingredients/lemon/lemon.obj",            "lemon"},
+        {"resources/ingredients/milk/milk.obj",              "milk"},
+        {"resources/ingredients/jam/jam.obj",                "jam"},
+        {"resources/ingredients/vanilla/vanilla.obj",        "vanilla"},
+        {"resources/ingredients/apple/apple.obj",            "apple"},
+        {"resources/ingredients/strawberry/strawberry.obj",  "strawberry"},
+        {"resources/ingredients/lem_marcio/lim_marcio.obj",  "lim_marcio"},
+        {"resources/ingredients/apple_gold/mela_oro.obj",    "mela_oro"},
+        {"resources/ingredients/choc_marcio/cioc_marcio.obj","cioc_marcio"},
+        {"resources/ingredients/strawb_gold/fragola_oro.obj","fragola_oro"},
+    };
 
-    bool spawnBomb = (rand() % 100) < 20; // 20% bomba
-    std::string path = spawnBomb
-        ? "resources/ingredients/bomb/bomb.obj"
-        : allIngredients[rand() % allIngredients.size()];
+    static const SpawnDef kBomb  = { "resources/ingredients/bomb/bomb.obj",  "bomb",  30.0f, true  };
+    static const SpawnDef kHeart = { "resources/ingredients/heart/heart.obj","heart", 28.0f, false };
 
+    // ------------------ difficoltà in base al livello ------------------
+    int currentLevel; 
+    const int lvl = std::max(1, currentLevel);
 
-    // Direzione verso l'alto e centro, con piccola deviazione casuale
-    glm::vec2 target(screen.w * 0.5f, screen.h * 0.7f); // centro alto
+    // Probabilità (percento)
+    const int heartPct = std::max(2, 5 - (lvl / 3));                 // 6% → 5% → ... → min 2%
+    const int bombPct  = std::min(38, 8 + 3 * (lvl - 1));           // 12% +2%/lvl → max 38%
+
+    // Scelta categoriale: prima cuore, poi bomba, altrimenti ingrediente
+    std::uniform_int_distribution<int> d100(0, 99);
+    int roll = d100(gen);
+
+    SpawnDef chosen;
+    if (roll < heartPct) {
+        chosen = kHeart;
+    } else if (roll < heartPct + bombPct) {
+        chosen = kBomb;
+    } else {
+        std::uniform_int_distribution<size_t> pick(0, kNonBomb.size() - 1);
+        chosen = kNonBomb[pick(gen)];
+    }
+
+    // ------------------ spawn point e direzione ------------------
+    glm::vec2 spawn = Ingredient::RandomSpawnPoint(); // ora spawna dai 4 lati (come hai messo)
+    glm::vec2 target(screen.w * 0.5f, screen.h * 0.6f);
     glm::vec2 dir = glm::normalize(target - spawn);
 
+    std::uniform_real_distribution<float> angleDeg(-12.0f, 12.0f);
+    dir = RotateVec2(dir, glm::radians(angleDeg(gen)));
 
-    // ±12° per ridurre lo sbandamento laterale
-    float angleOffset = ((rand() % 24) - 12) * 0.01745f;
-    dir = RotateVec2(dir, angleOffset);
+    // ------------------ velocità con scala sul livello ------------------
+    std::uniform_real_distribution<float> speedJit(600.0f, 700.0f);
+    float speed = speedJit(gen) * (0.7f + 0.07f * (lvl - 1));        // +7% per livello
+    speed = std::min(speed, 1400.0f);                                // clamp di sicurezza
 
-    // spinta un po' più “verticale/arcata”
-    float speed = 600.0f + static_cast<float>(rand() % 100); // 600–699
-
-    float scale = 30.0f;
-
-    Ingredient item(path.c_str(), spawn, scale, spawnBomb);
+    Ingredient item(chosen.path, spawn, chosen.scale, chosen.isBomb);
     item.SetVelocity(dir * speed);
     item.updateTime();
-    ingredients.push_back(item);
 
-
+    ingredients.emplace_back(std::move(item));
+    ingredientIds.emplace_back(chosen.id);
 }
 
+
 void character_callback(GLFWwindow* window, unsigned int codepoint) {
-    if (gameState == GameState::NAME_INPUT) {
-        if (codepoint == GLFW_KEY_BACKSPACE && !inputName.empty()) {
-            inputName.pop_back();
-        } else if (inputName.size() < 12 && codepoint >= 32 && codepoint <= 126) {
+    if (gameState != GameState::NAME_INPUT) return;
+
+    // Accetta solo caratteri stampabili ASCII
+    if (codepoint >= 32 && codepoint <= 126) {
+        if (inputName.size() < 10) {
             inputName += static_cast<char>(codepoint);
         }
     }
+    // Nota: niente gestione BACKSPACE qui; la fai già nel ramo NAME_INPUT
 }
+
 // Crea i punti di un contorno rettangolare con angoli smussati
 static void buildRoundedRectOutline(float x, float y, float w, float h,
     float r, int segs, std::vector<glm::vec2>& out)
@@ -273,18 +304,69 @@ int main() {
 	// load models
 	// -----------
 	Model backgroundPlane("resources/background/table.obj");
-	Model playButtonModel("resources/buttons/playButton.obj");
-	Model scoresButtonModel("resources/buttons/scoresButton.obj");
-	Model infoButtonModel("resources/buttons/infoButton.obj");
+	Model playButtonModel("resources/buttons/play.obj");
+	Model scoresButtonModel("resources/buttons/scores.obj");
+	Model infoButtonModel("resources/buttons/info.obj");
     Model lifeIcon("resources/ingredients/heart/heart.obj");
 	Model parchment("resources/recipes/pergamena.obj");
+	Model pauseModel("resources/levels/pause.obj");
+	Model rulesModel("resources/recipes/rules.obj");
+
+	std::vector<Model> recipeModels;
+	recipeModels.reserve(10);
+	for (int i = 1; i <= 10; ++i) {
+		recipeModels.emplace_back(("resources/recipes/ricetta" + std::to_string(i) + ".obj").c_str());
+	}
+
+	// Modelli "Livello X completato"
+	std::vector<std::unique_ptr<Model>> levelModels;
+	levelModels.reserve(10);
+	for (int i = 1; i <= 10; ++i) {
+		std::string p = "resources/levels/livello" + std::to_string(i) + ".obj";
+		levelModels.emplace_back(std::make_unique<Model>(p.c_str()));
+	}
+
+
+	// durata anteprima ricetta
+	constexpr double kRecipePreview = 10.0;  
+	constexpr double kCongratsTime  = 5.0;
+
+	// timestamp inizio stato RECIPE
+	int currentLevel = 1;
+	double recipeStartTime = 0.0;
+	double congratsStartTime = 0.0;
+
+
+	// vettore parallelo agli ingredienti per tenerne l'ID
+	std::vector<std::string> ingredientIds;                 // <--- AGGIUNTO
+	std::vector<std::string> recipeIds;
+
+	std::vector<std::unordered_map<std::string,int>> levelRecipes = {
+		{{"flour",2}, {"mil",3}, {"eggs",5}, {"lemon",1}, {"butter",2}, {"vanilla",1}},                                  // 1
+		{{"flour",2}, {"milk",2}, {"eggs",4}, {"apple",5}, {"butter",3}},                     // 2
+		{{"flour",2}, {"milk",1}, {"eggs",3}, {"strawberry",5}, {"jam",4}},                                            // 3
+		{{"pumpkin",2}, {"milk",3}, {"vanilla",1}, {"honey",4}},                           // 4
+		{{"milk",3}, {"lemon",5}, {"honey",4}},                  // 5
+		{{"chocolate",4}, {"eggs",2}, {"butter",4}, {"flour",3}},                             // 6
+		{{"strawberry",4}, {"lemon",3}, {"apple",2}, {"honey",2}},                               // 7
+		{{"chocolate",2}, {"milk",3}, {"flour",3}, {"eggs",2}},                                             // 8
+		{{"milk",3}, {"chocolate",3}, {"strawberry",4}},                                   // 9
+		{{"chocolate",3}, {"vanilla",3}, {"pumpkin",4}, {"eggs",3}}       // 10
+	};
+
+	auto applyLevel = [&](int lvl){
+		scoreManager.setRequiredRecipe(levelRecipes[lvl-1]);
+		recipeIds.clear();
+		for (auto &kv : levelRecipes[lvl-1]) recipeIds.push_back(kv.first);
+	}; 
+
    
 	glm::vec2 baseSize = glm::vec2(100.0f, 50.0f);
 	float spacing = 100.0f;
 
-	float playYScale = 1.0f;
-	float scoresYScale = 1.0f;
-	float infoYScale = 1.0f;
+	float playYScale = 2.0f;
+	float scoresYScale = 2.0f;
+	float infoYScale = 2.0f;
 
     Button playButton{  glm::vec2(0.5f, 0.75f), baseSize, playYScale,   "PLAY"   };
     Button scoresButton{glm::vec2(0.5f, 0.50f), baseSize, scoresYScale, "SCORES" };
@@ -318,6 +400,11 @@ int main() {
             ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
             backgroundPlane.Draw(ourShader);
 
+			//aggiorna hover
+			playButton.UpdateHover(mousePos);
+			scoresButton.UpdateHover(mousePos);
+			infoButton.UpdateHover(mousePos);
+
             // bottoni
             ourShader.setBool("hasTexture", false);
             playButton.Draw(ourShader, playButtonModel);
@@ -326,12 +413,20 @@ int main() {
 
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && playButton.isClicked(mousePos)) {
                 ingredients.clear();
+				ingredientIds.clear();
                 activeCuts.clear();
                 spawnTimer = 0.0f;
                 scoreManager.reset(3);           // reset punteggio e vite
-                gameState = GameState::PLAYING;
-                glEnable(GL_DEPTH_TEST);
-                continue;
+
+				currentLevel = 1;
+				applyLevel(currentLevel);
+
+                // Avvia stato RECIPE (3s)
+				recipeStartTime = glfwGetTime();
+				gameState = GameState::RECIPE;
+				glEnable(GL_DEPTH_TEST);
+				continue;
+
             }
             if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) && scoresButton.isClicked(mousePos)) {
                 gameState = GameState::SCORES;
@@ -340,235 +435,320 @@ int main() {
                 gameState = GameState::INFO;
             }
         }
+		else if (gameState == GameState::RECIPE) {
+			const double now = glfwGetTime();
+
+			// -- background come in PLAYING --
+			blurShader.use();
+			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+
+			blurShader.setVec2("rectMin", glm::vec2(-1.0f, -1.0f));
+    		blurShader.setVec2("rectMax", glm::vec2(-1.0f, -1.0f));
+			// se usi il focus blur anche qui, ripeti il setup del rect (facoltativo)
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			blurShader.setMat4("projection", orthoProj);
+			blurShader.setMat4("view", glm::mat4(1.0f));
+
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			blurShader.setMat4("model", model);
+			blurShader.setBool("hasTexture", true);
+			blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+			backgroundPlane.Draw(blurShader);
+
+			// -- mostra ricetta1.obj in ortho centrato --
+			glDisable(GL_DEPTH_TEST);
+			ourShader.use();
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+			ourShader.setBool("hasTexture", true);
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+
+			glm::mat4 rm(1.0f);
+			rm = glm::translate(rm, glm::vec3(screen.w * 0.5f, screen.h * 0.5f, 0.0f));
+			float s = std::min(screen.w, screen.h) * 0.18f;
+			rm = glm::scale(rm, glm::vec3(s, s, 1.0f));
+			ourShader.setMat4("model", rm);
+			recipeModels[currentLevel-1].Draw(ourShader);
+
+			// countdown in alto a destra
+			textShader.use();
+			textShader.setMat4("projection", orthoProj);
+			int remaining = (int)std::ceil(kRecipePreview - (now - recipeStartTime));
+			if (remaining < 0) remaining = 0;
+			textRenderer.DrawText(textShader, std::to_string(remaining),
+								screen.w - 70.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
+
+			// dopo 3s vai a PLAYING
+			if (now - recipeStartTime >= kRecipePreview) {
+				spawnTimer = 0.0f;              // così lo spawn parte “fresco”
+				glEnable(GL_DEPTH_TEST);
+				gameState = GameState::PLAYING;
+				continue;                       // passa subito al frame PLAYING
+			}
+		}
+
         else if (gameState == GameState::PLAYING) {
-            const double now = glfwGetTime();
-            blurShader.use();
+			const double now = glfwGetTime();
 
-            blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+			// --- Blur pass + focus rect (invariato) ---
+			blurShader.use();
+			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
 
-            // rettangolo non soggetto al blur 
-            //--------------------------------
-            glm::vec2 rectSize = focusBox.getScaledSize() * 2.0f;
-            glm::vec2 rectPos = focusBox.GetCenter();
-            //normalizzazione della size  
-            rectSize.x /= screen.w;
-            rectSize.y /= screen.h;
-            //invert y 
-            rectPos.y = 1 - rectPos.y;
-            //calcolo min
-            float rectMinX = rectPos.x - rectSize.x / 2.0f;
-            if (rectMinX < 0.0f) rectMinX = 0.0f;
-            float rectMinY = rectPos.y - rectSize.y / 2.0f;
-            if (rectMinY < 0.0f) rectMinY = 0.0f;
-            blurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
-            //calcolo max
-            float rectMaxX = rectPos.x + rectSize.x / 2.0f;
-            if (rectMaxX > 1.0f) rectMaxX = 1.0f;
-            float rectMaxY = rectPos.y + rectSize.y / 2.0f;
-            if (rectMaxY > 1.0f) rectMaxY = 1.0f;
-            blurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
-            //------------------------------------------------------------
+			glm::vec2 rectSize = focusBox.getScaledSize() * 2.0f;
+			glm::vec2 rectPos  = focusBox.GetCenter();
+			rectSize.x /= screen.w; rectSize.y /= screen.h;
+			rectPos.y = 1 - rectPos.y;
+			float rectMinX = rectPos.x - rectSize.x / 2.0f; if (rectMinX < 0.0f) rectMinX = 0.0f;
+			float rectMinY = rectPos.y - rectSize.y / 2.0f; if (rectMinY < 0.0f) rectMinY = 0.0f;
+			float rectMaxX = rectPos.x + rectSize.x / 2.0f; if (rectMaxX > 1.0f) rectMaxX = 1.0f;
+			float rectMaxY = rectPos.y + rectSize.y / 2.0f; if (rectMaxY > 1.0f) rectMaxY = 1.0f;
+			blurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
+			blurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
 
-            glDisable(GL_DEPTH_TEST);
+			glDisable(GL_DEPTH_TEST);
 
-            // Background
-            //-----------------
-            glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-            blurShader.setMat4("projection", orthoProj);
-            blurShader.setMat4("view", glm::mat4(1.0f));
+			// --- Background (invariato) ---
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			blurShader.setMat4("projection", orthoProj);
+			blurShader.setMat4("view", glm::mat4(1.0f));
+
+			glm::mat4 model = glm::mat4(1.0f);
+			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			blurShader.setMat4("model", model);
+			blurShader.setBool("hasTexture", true);
+			blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+			backgroundPlane.Draw(blurShader);
 
 
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
-            blurShader.setMat4("model", model);
-            blurShader.setBool("hasTexture", true);  // background ha texture
-            blurShader.setVec3("diffuseColor", glm::vec3(1.0f)); // fallback nel caso
-            backgroundPlane.Draw(blurShader);
+			// --- Matrici per ingredienti (invariato) ---
+			glm::mat4 ingProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			glm::mat4 ingView(1.0f);
+			glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+			glm::mat4 view = camera.GetViewMatrix();
+			model = glm::scale(model, glm::vec3(20.0f));
 
-            // Ingredients
-            //---------------
-            glm::mat4 ingProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-            glm::mat4 ingView(1.0f);
-            glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-            glm::mat4 view = camera.GetViewMatrix();
-            model = glm::scale(model, glm::vec3(20.0f));  // per test visibilità
-
-            spawnTimer += deltaTime;
-            if (spawnTimer >= spawnInterval) {
-                SpawnRandomIngredient();
-                spawnTimer = 0.0f;
-            }
+			spawnTimer += deltaTime;
+			if (spawnTimer >= spawnInterval) {
+				SpawnRandomIngredientWithId(ingredients, ingredientIds);
+				spawnTimer = 0.0f;
+			}
 
 
+			// --- Disegno/Logica ingredienti ---
+			if (!ingredients.empty()) {
+				glEnable(GL_DEPTH_TEST);
+				ourShader.use();
+				ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+				ourShader.setBool("hasTexture", true);
 
-            if (!ingredients.empty()) {
+				glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
+				glm::mat4 view = camera.GetViewMatrix();
+
+				// Input per taglio
+				if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+					if (!isDragging) {
+						isDragging = true;
+						mouseTrail.clear();
+					}
+				} else {
+					if (isDragging) {
+						isDragging = false;
+						if (!mouseTrail.empty() && camera.Zoom != 0.0f) {
+							// PASSA ANCHE ingredientIds
+							scoreManager.processSlash(
+								mouseTrail, ingProj, ingView, focusBox,
+								ingredients, ingredientIds,          // <-- CAMBIATO
+								activeCuts, screen, now, gameState
+							);
+						}
+						mouseTrail.clear();
+					}
+				}
+
+				// Aggiorna e disegna ingredienti
+				objBlurShader.use();
+				objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+				objBlurShader.setMat4("projection", ingProj);
+				objBlurShader.setMat4("view", ingView);
+				objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
+				objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
+
+				glDisable(GL_DEPTH_TEST);
+				for (auto& ing : ingredients) {
+					ing.Move();
+					Texture* t = ing.getFirstTexture();
+					if (t != nullptr) {
+						objBlurShader.setVec2("uTexelSize", glm::vec2(1.0f / t->w, 1.0f / t->h));
+					}
+					objBlurShader.setMat4("model", ing.GetModelMatrix());
+					objBlurShader.setBool("hasTexture", true);
+					objBlurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+					ing.Draw(objBlurShader);
+				}
+			}
+
+			// --- UI: vite + punteggio (invariato) ---
+			glDisable(GL_DEPTH_TEST);
+			ourShader.use();
+			glm::mat4 uiProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			ourShader.setMat4("projection", uiProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+			ourShader.setBool("hasTexture", true);
+			ourShader.setVec3("diffuseColor", glm::vec3(1));
+
+			const float padX = 60.0f, padY = 60.0f, iconSize = 28.0f, step = 80.0f;
+			for (int i = 0; i < scoreManager.getLives(); ++i) {
+				float x = padX + i * (iconSize + step);
+				float y = screen.h - padY;
+				glm::mat4 m(1.0f);
+				m = glm::translate(m, glm::vec3(x, y, 0.0f));
+				m = glm::scale(m, glm::vec3(iconSize, iconSize, 1.0f));
+				ourShader.setMat4("model", m);
+				lifeIcon.Draw(ourShader);
+			}
+
+			textShader.use();
+			textShader.setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
+			std::string scoreText = "SCORE " + std::to_string(scoreManager.getScore());
+			textRenderer.DrawText(textShader, scoreText, screen.w - 250.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
+			
+			// --- Lista ingredienti richiesti con quantità rimanente, sotto "Score" ---
+			{
+				const float startX = screen.w - 180.0f;   // allinea con lo "Score"
+				float y = screen.h - 110.0f;              // un po' sotto la riga dello score
+				const float lineStep = 30.0f;             // distanza tra righe
+
+				for (const auto& id : recipeIds) {
+					int req = scoreManager.getRequiredQty(id);
+					int got = scoreManager.getCollectedQty(id);
+					int rem = std::max(0, req - got);
+
+					// colore: bianco se ancora da prendere, verdino se completato
+					glm::vec3 col = (rem > 0) ? glm::vec3(1.0f) : glm::vec3(0.6f, 1.0f, 0.6f);
+
+					// es. "latte x1"
+					std::string line = id + " x" + std::to_string(rem);
+					textRenderer.DrawText(textShader, line, startX, y, 0.5f, col);
+					y -= lineStep;
+				}
+			}
+
+			// --- Disegno scia mouse + processSlash in drag (passa ingredientIds) ---
+			if (isDragging && mouseTrail.size() >= 2) {
+				// 1) scia
+				trailShader->use();
+				glm::mat4 proj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
+				trailShader->setMat4("projection", proj);
+				trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f));
+				std::vector<float> trailData;
+				for (const auto& pt : mouseTrail) { trailData.push_back(pt.x); trailData.push_back(pt.y); }
+				glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+				glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * trailData.size(), trailData.data());
+				glBindVertexArray(trailVAO);
+				glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mouseTrail.size());
+				glBindVertexArray(0);
+
+				// 2) processa il taglio
+				scoreManager.processSlash(
+					mouseTrail, ingProj, ingView, focusBox,
+					ingredients, ingredientIds,              // <-- CAMBIATO
+					activeCuts, screen, now, gameState
+				);
+			}
+
+			// --- Effetti taglio (invariato) ---
+			glLineWidth(4.0f);
+			trailShader->use();
+			trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f));
+			trailShader->setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
+
+			std::vector<float> cutData;
+			for (auto it = activeCuts.begin(); it != activeCuts.end(); ) {
+				double age = now - it->timestamp;
+				if (age > 0.2) { it = activeCuts.erase(it); continue; }
+				cutData.push_back(it->start.x); cutData.push_back(it->start.y);
+				cutData.push_back(it->end.x);   cutData.push_back(it->end.y);
+				++it;
+			}
+			if (!cutData.empty()) {
+				glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+				glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * cutData.size(), cutData.data());
+				glBindVertexArray(trailVAO);
+				glDrawArrays(GL_LINES, 0, (GLsizei)(cutData.size() / 2));
+				glBindVertexArray(0);
+			}
+
+			glEnable(GL_DEPTH_TEST);
+		}
+
+		else if (gameState == GameState::CONGRATULATIONS) {
+			const double now = glfwGetTime();
+
+			// background (riusa quello di PLAYING)
+			blurShader.use();
+			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+			
+			blurShader.setVec2("rectMin", glm::vec2(-1.0f, -1.0f));
+            blurShader.setVec2("rectMax", glm::vec2(-1.0f, -1.0f));
+			
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			blurShader.setMat4("projection", orthoProj);
+			blurShader.setMat4("view", glm::mat4(1.0f));
+
+			glm::mat4 model(1.0f);
+			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			blurShader.setMat4("model", model);
+			blurShader.setBool("hasTexture", true);
+			blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+			backgroundPlane.Draw(blurShader);
+
+			// Mostra il modello del livello corrente (niente testo)
+			glDisable(GL_DEPTH_TEST);
+			ourShader.use();
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+			ourShader.setBool("hasTexture", true);
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+
+			glm::mat4 lm(1.0f);
+			lm = glm::translate(lm, glm::vec3(screen.w * 0.5f, screen.h * 0.5f, 0.0f));
+			float s = std::min(screen.w, screen.h) * 0.20f; // scala “comoda”, regola se serve
+			lm = glm::scale(lm, glm::vec3(s, s, 1.0f));
+			ourShader.setMat4("model", lm);
+
+			// Disegna "resources/levels/livelloX.obj"
+			if (currentLevel >= 1 && currentLevel <= (int)levelModels.size()) {
+				levelModels[currentLevel - 1]->Draw(ourShader);
+			}
+
+			// entra in congrats al primo frame
+			if (congratsStartTime == 0.0) congratsStartTime = now;
+
+			// dopo 5s, passa al livello successivo o a NAME_INPUT
+			if (now - congratsStartTime >= kCongratsTime) {
+				congratsStartTime = 0.0;
+				if (currentLevel >= 10) {
+					gameState = GameState::NAME_INPUT; // ultimo livello completato
+				} else {
+					++currentLevel;
+					applyLevel(currentLevel);
+
+					ingredients.clear();
+					ingredientIds.clear();
+					activeCuts.clear();
+					spawnTimer = 0.0f;
+
+					recipeStartTime = glfwGetTime();
+					gameState = GameState::RECIPE;
+				}
+			}
+		}
 
 
-                glEnable(GL_DEPTH_TEST);
-                ourShader.use();
-                ourShader.setVec3("diffuseColor", glm::vec3(1.0f));  // colore fallback bianco
-                ourShader.setBool("hasTexture", true);              // o false se vuoi colore puro
-
-
-                glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-                glm::mat4 view = camera.GetViewMatrix();
-
-                // Taglio con mouse trail
-                if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-                    if (!isDragging) {
-                        isDragging = true;
-                        mouseTrail.clear();
-                    }
-                }
-                else {
-
-
-                    if (isDragging) {
-                        isDragging = false;
-                        if (!mouseTrail.empty() && camera.Zoom != 0.0f) {
-                            // Se c'è una scia, processala
-                            scoreManager.processSlash(
-                                mouseTrail, ingProj, ingView, focusBox,
-                                ingredients, activeCuts,
-                                screen,
-                                now,
-                                gameState
-                            );
-                        }
-
-                        mouseTrail.clear();
-                    }
-                }
-
-                // Aggiorna e disegna tutti gli ingredienti
-                objBlurShader.use();
-                objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
-                objBlurShader.setMat4("projection", ingProj);
-                objBlurShader.setMat4("view", ingView);
-                objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
-                objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
-
-                glDisable(GL_DEPTH_TEST);
-                for (auto& ing : ingredients) {
-                    ing.Move();
-                    //texure height and width foer uTextelSize
-                    Texture* t = ing.getFirstTexture();
-                    if (t != nullptr) {
-                        int tW = t->w;
-                        int tH = t->h;
-                        objBlurShader.setVec2("uTexelSize", glm::vec2(1.0f / tW, 1.0f / tH));
-                    }
-                    objBlurShader.setMat4("model", ing.GetModelMatrix());
-                    objBlurShader.setBool("hasTexture", true);
-                    objBlurShader.setVec3("diffuseColor", glm::vec3(1.0f));
-                    ing.Draw(objBlurShader);
-
-                }
-            }
-
-            glDisable(GL_DEPTH_TEST);
-            // --- UI pass: vite in alto a sinistra, senza depth test ---
-            ourShader.use();
-            glm::mat4 uiProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
-            ourShader.setMat4("projection", uiProj);
-            ourShader.setMat4("view", glm::mat4(1.0f));
-            ourShader.setBool("hasTexture", true);
-            ourShader.setVec3("diffuseColor", glm::vec3(1)); // colore fallback
-
-
-            const float padX = 60.0f;
-            const float padY = 60.0f;
-            const float iconSize = 28.0f;
-            const float step = 80.0f;
-
-            for (int i = 0; i < scoreManager.getLives(); ++i) {
-                float x = padX + i * (iconSize + step);
-                float y = screen.h - padY;
-
-                glm::mat4 m(1.0f);
-                m = glm::translate(m, glm::vec3(x, y, 0.0f));
-                // Se il modello è centrato sull'origine, nessun offset extra:
-                m = glm::scale(m, glm::vec3(iconSize, iconSize, 1.0f));
-
-
-                ourShader.setMat4("model", m);
-                lifeIcon.Draw(ourShader);
-            }
-            // Disegna lo score in alto a destra
-            textShader.use();
-            textShader.setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
-
-            std::string scoreText = "Score: " + std::to_string(scoreManager.getScore());
-            textRenderer.DrawText(textShader, scoreText, screen.w - 250.0f, screen.h - 60.0f, 1.0f, glm::vec3(1.0f, 1.0f, 0.4f));
-
-
-
-            if (isDragging && mouseTrail.size() >= 2) {
-                // 1. Disegna la scia del mouse
-                trailShader->use();
-
-                glm::mat4 proj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
-                trailShader->setMat4("projection", proj);
-                trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f)); // giallo
-
-                std::vector<float> trailData;
-                for (const auto& pt : mouseTrail) {
-                    trailData.push_back(pt.x);
-                    trailData.push_back(pt.y);
-                }
-
-                glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
-                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * trailData.size(), trailData.data());
-
-                glBindVertexArray(trailVAO);
-                glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mouseTrail.size());
-                glBindVertexArray(0);
-
-                // 2. Processa il taglio sugli ingredienti
-                
-                scoreManager.processSlash(
-                    mouseTrail, ingProj, ingView, focusBox,
-                    ingredients, activeCuts,
-                    screen,
-                    now,
-                    gameState
-                );
-
-            }
-
-            // Disegna gli effetti di taglio (scia temporanea)
-            
-            glLineWidth(4.0f);
-            trailShader->use();
-            trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f));  // bianco-giallo chiaro
-            trailShader->setMat4("projection", glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h));
-
-            std::vector<float> cutData;
-            for (auto it = activeCuts.begin(); it != activeCuts.end(); ) {
-                double age = now - it->timestamp;
-                if (age > 0.2) {
-                    it = activeCuts.erase(it);  // scade dopo 0.2s
-                    continue;
-                }
-                // aggiungi segmento alla linea
-                cutData.push_back(it->start.x);
-                cutData.push_back(it->start.y);
-                cutData.push_back(it->end.x);
-                cutData.push_back(it->end.y);
-                ++it;
-            }
-
-            if (!cutData.empty()) {
-                glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
-                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * cutData.size(), cutData.data());
-
-                glBindVertexArray(trailVAO);
-                glDrawArrays(GL_LINES, 0, (GLsizei)(cutData.size() / 2));
-                glBindVertexArray(0);
-            }
-            glEnable(GL_DEPTH_TEST);
-        }
         else if (gameState == GameState::SCORES) {
 			
 			ourShader.use();
@@ -626,10 +806,31 @@ int main() {
             float innerH = pH - (padT + padB);
 
 
-            // Header "Classifica" fisso dentro la pergamena
-            textShader.use();
-            textShader.setMat4("projection", orthoProj);
-            textRenderer.DrawText(textShader, "HIGH SCORE", innerX, innerY + innerH + 40.0f, 1.2f, glm::vec3(0.25f, 0.15f, 0.06f));
+            // Helper per misurare la larghezza del testo (in px)
+			auto textWidthPx = [&](const std::string& s, float scale) {
+				float w = 0.0f;
+				for (char c : s) {
+					auto it = textRenderer.Characters.find(c);
+					if (it != textRenderer.Characters.end())
+						w += (it->second.Advance >> 6) * scale; // Advance è in 1/64 px
+				}
+				return w;
+			};
+
+			textShader.use();
+			textShader.setMat4("projection", orthoProj);
+
+			const float headerScale = 1.2f;
+			const std::string header = "HIGH SCORE";
+
+			// X centrata rispetto allo schermo
+			float headerX = (screen.w - textWidthPx(header, headerScale)) * 0.5f;
+			// Y dove lo avevi (sopra l’area lista)
+			float headerY = innerY + innerH + 40.0f;
+
+			textRenderer.DrawText(textShader, header, headerX, headerY, headerScale,
+								glm::vec3(0.25f, 0.15f, 0.06f));
+
 
             // Zona scrollabile: parte sotto il titolo
             float headerH = 56.0f;               // altezza riservata al titolo dentro la pergamena
@@ -763,11 +964,41 @@ int main() {
 			ourShader.setBool("hasTexture", true);  // background ha texture
 			ourShader.setVec3("diffuseColor", glm::vec3(2.0f)); // fallback nel caso
 			backgroundPlane.Draw(ourShader);
-			// Titolo
-			textRenderer.DrawText(textShader, "INSERISCI NOME:", screen.w / 3, screen.h / 2 + 50, 1.0f, glm::vec3(1.0f));
 
-			// Mostra testo digitato
-			textRenderer.DrawText(textShader, inputName + "_", screen.w / 3, screen.h / 2, 1.0f, glm::vec3(0.5f, 1.0f, 0.5f));
+			// Titolo + input centrati orizzontalmente
+			textShader.use();
+			textShader.setMat4("projection", orthoProj);
+
+			// Helper per misurare la larghezza del testo in pixel (usa l'Advance dei glifi)
+			auto textWidthPx = [&](const std::string& s, float scale) -> float {
+				float w = 0.0f;
+				for (char c : s) {
+					auto it = textRenderer.Characters.find(c);
+					if (it != textRenderer.Characters.end()) {
+						w += (it->second.Advance >> 6) * scale; // Advance è in 1/64 px
+					}
+				}
+				return w;
+			};
+
+			const float titleScale = 1.0f;
+			const float inputScale = 1.0f;
+
+			std::string title = "INSERISCI NOME:";
+			std::string input = inputName + "_";
+
+			// X centrata: (larghezza schermo - larghezza testo)/2
+			float titleX = (screen.w - textWidthPx(title, titleScale)) * 0.5f;
+			float inputX = (screen.w - textWidthPx(input, inputScale)) * 0.5f;
+
+			// Y: due righe attorno al centro dello schermo (leggermente separate)
+			float centerY = screen.h * 0.5f;
+			float titleY  = centerY + 40.0f;  // sopra al centro
+			float inputY  = centerY - 10.0f;  // sotto al centro
+
+			textRenderer.DrawText(textShader, title, titleX, titleY, titleScale, glm::vec3(1.0f));
+			textRenderer.DrawText(textShader, input, inputX, inputY, inputScale, glm::vec3(0.5f, 1.0f, 0.5f));
+
 
             // BACKSPACE con delay
             if (glfwGetKey(window, GLFW_KEY_BACKSPACE) == GLFW_PRESS && !inputName.empty()) {
@@ -789,14 +1020,65 @@ int main() {
             }
         }
         else if (gameState == GameState::PAUSED) {
-            glDisable(GL_DEPTH_TEST);
-            textShader.use();
-            glm::mat4 projection = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h);
-            textShader.setMat4("projection", projection);
-            textRenderer.DrawText(textShader, "GAME PAUSED",           screen.w / 2 - 150.0f, screen.h / 2,         1.5f, glm::vec3(1.0f, 0.5f, 0.0f));
-            textRenderer.DrawText(textShader, "Press P to RESUME",     screen.w / 2 - 200.0f, screen.h / 2 - 100.0f, 1.0f, glm::vec3(1.0f));
-            textRenderer.DrawText(textShader, "Press ESC to EXIT MENU",screen.w / 2 - 220.0f, screen.h / 2 - 150.0f, 1.0f, glm::vec3(1.0f));
-        }
+			glDisable(GL_DEPTH_TEST);
+
+			// Background come negli altri menu
+			ourShader.use();
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+			ourShader.setBool("hasTexture", true);
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+
+			glm::mat4 bg(1.0f);
+			bg = glm::translate(bg, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			bg = glm::scale(bg, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			ourShader.setMat4("model", bg);
+			backgroundPlane.Draw(ourShader);
+
+			// Modello di pausa centrato
+			glm::mat4 pm(1.0f);
+			pm = glm::translate(pm, glm::vec3(screen.w * 0.5f, screen.h * 0.5f, 0.0f));
+			float s = std::min(screen.w, screen.h) * 0.20f; // regola se serve più grande/piccolo
+			pm = glm::scale(pm, glm::vec3(s, s, 1.0f));
+			ourShader.setMat4("model", pm);
+			pauseModel.Draw(ourShader);
+		}
+		else if (gameState == GameState::INFO) {
+			// Background uguale a PLAYING ma senza focus box
+			blurShader.use();
+			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
+
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+			blurShader.setMat4("projection", orthoProj);
+			blurShader.setMat4("view", glm::mat4(1.0f));
+
+			glm::mat4 bg(1.0f);
+			bg = glm::translate(bg, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
+			bg = glm::scale(bg, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
+			blurShader.setMat4("model", bg);
+			blurShader.setBool("hasTexture", true);
+			blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
+			backgroundPlane.Draw(blurShader);
+
+			// Modello delle regole centrato
+			glDisable(GL_DEPTH_TEST);
+			ourShader.use();
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+			ourShader.setBool("hasTexture", true);
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+
+			glm::mat4 m(1.0f);
+			m = glm::translate(m, glm::vec3(screen.w * 0.5f, screen.h * 0.5f, 0.0f));
+			float s = std::min(screen.w, screen.h) * 0.15f;   // regola se serve
+			m = glm::scale(m, glm::vec3(s, s, 1.0f));
+			ourShader.setMat4("model", m);
+
+			rulesModel.Draw(ourShader);
+			glEnable(GL_DEPTH_TEST);
+		}
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();

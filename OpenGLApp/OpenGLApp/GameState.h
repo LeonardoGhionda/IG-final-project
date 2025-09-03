@@ -3,7 +3,9 @@
 
 enum class GameState {
     MENU,
+    RECIPE,
     PLAYING,
+    CONGRATULATIONS,
     SCORES,
     INFO,
     PAUSED,
