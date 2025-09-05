@@ -342,7 +342,7 @@ int main() {
 	std::vector<std::string> recipeIds;
 
 	std::vector<std::unordered_map<std::string,int>> levelRecipes = {
-		{{"flour",2}, {"mil",3}, {"eggs",5}, {"lemon",1}, {"butter",2}, {"vanilla",1}},                                  // 1
+		{{"flour",2}, {"milk",3}, {"eggs",5}, {"lemon",1}, {"butter",2}, {"vanilla",1}},                                  // 1
 		{{"flour",2}, {"milk",2}, {"eggs",4}, {"apple",5}, {"butter",3}},                     // 2
 		{{"flour",2}, {"milk",1}, {"eggs",3}, {"strawberry",5}, {"jam",4}},                                            // 3
 		{{"pumpkin",2}, {"milk",3}, {"vanilla",1}, {"honey",4}},                           // 4
