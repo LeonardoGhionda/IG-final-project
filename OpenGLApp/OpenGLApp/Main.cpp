@@ -97,8 +97,10 @@ unsigned int trailVAO = 0, trailVBO = 0;
 Shader* trailShader = nullptr;
 
 // gioco
-GameState gameState = GameState::MENU;
+GameState gameState = GameState::START;
 std::vector<Ingredient> ingredients;
+
+double startScreenStartTime = 0.0;
 
 // -----------------------------------------------------------------------------
 // Funzioni di supporto
@@ -311,6 +313,7 @@ int main() {
 	Model parchment("resources/recipes/pergamena.obj");
 	Model pauseModel("resources/levels/pause.obj");
 	Model rulesModel("resources/recipes/rules.obj");
+	Model startBackground("resources/background/startBackground.obj");
 
 	std::vector<Model> recipeModels;
 	recipeModels.reserve(10);
@@ -328,7 +331,7 @@ int main() {
 
 
 	// durata anteprima ricetta
-	constexpr double kRecipePreview = 1.0;  
+	constexpr double kRecipePreview = 5.0;  
 	constexpr double kCongratsTime  = 5.0;
 
 	// timestamp inizio stato RECIPE
@@ -435,6 +438,41 @@ int main() {
                 gameState = GameState::INFO;
             }
         }
+		else if (gameState == GameState::START) {
+			const double now = glfwGetTime();
+			glDisable(GL_DEPTH_TEST);
+
+			// proiezione ortografica in pixel
+			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+
+			// disegna background completamente adattato alla finestra
+			ourShader.use();
+			ourShader.setMat4("projection", orthoProj);
+			ourShader.setMat4("view", glm::mat4(1.0f));
+			ourShader.setBool("hasTexture", true);
+			ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
+
+			glm::mat4 m(1.0f);
+			m = glm::translate(m, glm::vec3(screen.w * 0.5f, screen.h * 0.5f, 0.0f));
+			// Se il modello è un quad unitario centrato, questa scala lo “stira” esattamente alla finestra:
+			m = glm::scale(m, glm::vec3(screen.w, screen.h, 1.0f));
+			ourShader.setMat4("model", m);
+			startBackground.Draw(ourShader);
+
+			// --- Timer di ingresso (prima volta) ---
+			if (startScreenStartTime == 0.0) {
+				startScreenStartTime = now;
+			}
+
+			// --- Uscita: click o dopo 5 secondi ---
+			if (keys.PressedAndReleased(GLFW_MOUSE_BUTTON_LEFT) ||
+				(now - startScreenStartTime) >= 5.0) {
+				startScreenStartTime = 0.0;
+				gameState = GameState::MENU;
+				continue; // evita di processare click sul MENU nello stesso frame
+			}
+		}
+
 		else if (gameState == GameState::RECIPE) {
 			const double now = glfwGetTime();
 
