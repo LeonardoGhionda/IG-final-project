@@ -328,7 +328,7 @@ int main() {
 
 
 	// durata anteprima ricetta
-	constexpr double kRecipePreview = 10.0;  
+	constexpr double kRecipePreview = 1.0;  
 	constexpr double kCongratsTime  = 5.0;
 
 	// timestamp inizio stato RECIPE
@@ -573,6 +573,10 @@ int main() {
 				objBlurShader.setVec2("uInvViewport", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
 				objBlurShader.setMat4("projection", ingProj);
 				objBlurShader.setMat4("view", ingView);
+				rectMinX += static_cast<float>(screen.paddingW)/ screen.w;
+				rectMaxX += static_cast<float>(screen.paddingW)/ screen.w;
+				rectMinY += static_cast<float>(screen.paddingH)/ screen.h;
+				rectMaxY += static_cast<float>(screen.paddingH)/ screen.h;
 				objBlurShader.setVec2("rectMin", glm::vec2(rectMinX, rectMinY));
 				objBlurShader.setVec2("rectMax", glm::vec2(rectMaxX, rectMaxY));
 

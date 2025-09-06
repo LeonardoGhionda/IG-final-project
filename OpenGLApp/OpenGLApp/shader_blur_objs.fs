@@ -17,14 +17,12 @@ void main() {
     vec2 fragUV = gl_FragCoord.xy * uInvViewport;
 
     bool inside = fragUV.x >= rectMin.x && fragUV.x <= rectMax.x &&  
-                  1-fragUV.y >= rectMin.y && 1-fragUV.y <= rectMax.y; //non capisco perchè quà vanno invertite e nell'altro no
+                  fragUV.y >= rectMin.y && fragUV.y <= rectMax.y; 
 
     color = texture(texture_diffuse1, TexCoords).rgb;
     if(!inside) {
         color *= 0.15f;  
     }
-
-    
 
     FragColor = vec4(color, 1.0);
 }
