@@ -2,6 +2,7 @@
 #pragma once
 
 enum class GameState {
+    START,
     MENU,
     RECIPE,
     PLAYING,
