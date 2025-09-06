@@ -17,7 +17,7 @@ void main() {
     vec2 fragUV = gl_FragCoord.xy * uInvViewport;
 
     bool inside = fragUV.x >= rectMin.x && fragUV.x <= rectMax.x &&  
-                  fragUV.y >= rectMin.y && fragUV.y <= rectMax.y; 
+                  1-fragUV.y >= rectMin.y && 1-fragUV.y <= rectMax.y; 
 
     color = texture(texture_diffuse1, TexCoords).rgb;
     if(!inside) {
