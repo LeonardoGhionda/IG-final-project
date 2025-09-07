@@ -165,10 +165,22 @@ void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
         chosen = kHeart;
     } else if (roll < heartPct + bombPct) {
         chosen = kBomb;
-    } else {
-        std::uniform_int_distribution<size_t> pick(0, kNonBomb.size() - 1);
-        chosen = kNonBomb[pick(gen)];
     }
+	else {
+		// Costruisci lista pesata ingredienti in base a quanto richiesto nella ricetta corrente
+		std::vector<double> weights;
+		weights.reserve(kNonBomb.size());
+
+		for (const auto& def : kNonBomb) {
+			int qty = scoreManager.getRequiredQty(def.id);
+			// Se l’ingrediente è richiesto nella ricetta → peso maggiore
+			double w = (qty > 0) ? (1.0 + qty * 2.0) : 1.0;
+			weights.push_back(w);
+		}
+
+		std::discrete_distribution<size_t> pick(weights.begin(), weights.end());
+		chosen = kNonBomb[pick(gen)];
+	}
 
     // ------------------ spawn point e direzione ------------------
     glm::vec2 spawn = Ingredient::RandomSpawnPoint(); // ora spawna dai 4 lati (come hai messo)
@@ -340,8 +352,8 @@ int main() {
 
 
 	// durata anteprima ricetta
-	constexpr double kRecipePreview = 5.0;  
-	constexpr double kCongratsTime  = 5.0;
+	constexpr double kRecipePreview = 10.0;  
+	constexpr double kCongratsTime  = 10.0;
 
 	// timestamp inizio stato RECIPE
 	int currentLevel = 1;
@@ -1152,7 +1164,7 @@ void processInput(GLFWwindow* window, FocusBox& focusBox) {
     float currentSpeed = focusSpeed * deltaTime;
 
     // boost con SPACE
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) currentSpeed *= 8.0f;
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) currentSpeed *= 5.0f;
 
     if (gameState == GameState::PLAYING) {
         float s = currentSpeed;
