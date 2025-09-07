@@ -102,6 +102,12 @@ std::vector<Ingredient> ingredients;
 
 double startScreenStartTime = 0.0;
 
+static float frand(float a, float b) {
+	static std::mt19937 gen{ std::random_device{}() };
+	std::uniform_real_distribution<float> d(a, b);
+	return d(gen);
+}
+
 // -----------------------------------------------------------------------------
 // Funzioni di supporto
 // -----------------------------------------------------------------------------
@@ -166,7 +172,9 @@ void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
 
     // ------------------ spawn point e direzione ------------------
     glm::vec2 spawn = Ingredient::RandomSpawnPoint(); // ora spawna dai 4 lati (come hai messo)
-    glm::vec2 target(screen.w * 0.5f, screen.h * 0.6f);
+
+	glm::vec2 target = { frand(0.0f, screen.w), frand(0.0f, screen.h) };
+
     glm::vec2 dir = glm::normalize(target - spawn);
 
     std::uniform_real_distribution<float> angleDeg(-12.0f, 12.0f);
@@ -235,6 +243,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
@@ -631,6 +640,7 @@ int main() {
 					ing.Draw(objBlurShader);
 				}
 			}
+		
 
 			// --- UI: vite + punteggio (invariato) ---
 			glDisable(GL_DEPTH_TEST);
