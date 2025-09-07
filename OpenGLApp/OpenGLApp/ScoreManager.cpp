@@ -1,7 +1,7 @@
 // ScoreManager.cpp
 #include "ScoreManager.h"
 #include "focusbox.h"
-#include "ingredient.h"    // deve dichiarare MCSPositionOrtho(), IsBomb()
+#include "ingredient.h"   
 #include "Effects.h"
 #include "screen.h"
 
@@ -59,7 +59,6 @@ void ScoreManager::processSlash(const std::vector<glm::vec2>& trail,
         }
 
         if (hit) {
-            // focusbox 0..1 come prima
             glm::vec2 rectSize01 = focusBox.getScaledSize() * 2.0f;
             rectSize01.x /= static_cast<float>(screen.w);
             rectSize01.y /= static_cast<float>(screen.h);
@@ -127,7 +126,6 @@ void ScoreManager::processSlash(const std::vector<glm::vec2>& trail,
     }
 }
 
-// ------------------- le tue funzioni di persistenza -------------------
 
 std::vector<ScoreEntry> ScoreManager::LoadScores(const std::string& filename) {
     std::vector<ScoreEntry> scores;

@@ -6,7 +6,6 @@
 #include "screen.h"
 #include <GLFW/glfw3.h>
 
-//#define G glm::vec2(0.0f, -3.0f)
 #define G glm::vec2(0.0f, -6.0f)
 
 
@@ -25,7 +24,6 @@ public:
 
         center = model.getModelAveragePosition();
 
-        //get a direction towards the center shifted by a small random angle 
         std::random_device rd;
         std::mt19937 gen(rd());
 
@@ -35,7 +33,6 @@ public:
         float CHBSq = 0.0f;
         for (const Mesh& m : model.meshes) {
             for (const Vertex& v : m.vertices) {
-                //search for max square distance (to use sqrt only once in the end)
                 CHBSq = glm::max(glm::dot(v.Position, v.Position), CHBSq);
             }
         }
@@ -76,23 +73,20 @@ public:
     }
 
 
-    //center position in world space 
     glm::vec3 Position() const {
         glm::vec3 scaledCenter = glm::vec3(center) * scaleFactor;
         return glm::vec3(position, 0.0f) + scaledCenter;
     }
 
 
-    //Model center posizion in the mouse coordinate system
     glm::vec2 MCSPosition(glm::mat4 projection, glm::mat4 view) {
 
         // M -> V -> P
         glm::vec4 clipSpace = projection * view * glm::vec4(Position(), 1.0f);
 
-        //(-1 , 1)
         glm::vec3 normalizedCS = glm::vec3(clipSpace) / clipSpace.w;
 
-        // Screen-space (pixel,  0 - width/height)
+      
         glm::vec2 screenPos;
         screenPos.x = (normalizedCS.x + 1.0f) * 0.5f * screen.w + screen.paddingW;
         screenPos.y = (1.0f - (normalizedCS.y + 1.0f) * 0.5f) * screen.h + screen.paddingH;
@@ -162,19 +156,19 @@ private:
     Model model;
     glm::mat4 mat;
     float time;
-    float CHB;         //radius of a circular hitbox
-    float pCHB = -1;   //radius of a circular hitbox projcted in MCS 
-    glm::vec3 center;  //average center position Model matrix independent
+    float CHB;       
+    float pCHB = -1;  
+    glm::vec3 center;  
     glm::vec2 position;
     glm::vec2 velocity;
     glm::vec2 spawnpoint;
-    glm::vec2 directionToCenter; //direction towards the center of the screen shifted by a small random angle
+    glm::vec2 directionToCenter; 
     bool isBomb_ = false;
 
-    //circular hitbox in mouse coord system
+    
     float CHB_MCS(glm::mat4 projection, glm::mat4 view) {
 
-        if (pCHB > 0.0) return pCHB; //no need to compute again
+        if (pCHB > 0.0) return pCHB;
 
         glm::vec4 center = projection * view * glm::vec4(Position(), 1.0f);
         glm::vec4 offset = projection * view * glm::vec4(Position() + glm::vec3(CHB, 0.0f, 0.0f), 1.0f);

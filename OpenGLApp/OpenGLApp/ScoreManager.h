@@ -2,7 +2,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
-#include <unordered_map>              // <--- AGGIUNTO
+#include <unordered_map>              
 #include <glm/vec2.hpp>
 #include <glm/mat4x4.hpp>
 #include "GameState.h"
@@ -26,11 +26,10 @@ public:
     int  getScore() const { return m_score; }
     int  getLives() const { return m_lives; }
 
-    void addLife(int n = 1) {                           // <--- AGGIUNTO
+    void addLife(int n = 1) {                           
         m_lives = std::min(MAX_LIVES, m_lives + n);
     }
 
-    // --- NUOVO: definisci la ricetta (ID -> quantità)
     void setRequiredRecipe(const std::unordered_map<std::string,int>& req) {
         m_required = req;
         m_collected.clear();
@@ -44,13 +43,12 @@ public:
         return it == m_collected.end() ? 0 : it->second;
     }
 
-    // --- CAMBIATA: passiamo anche gli ID paralleli
     void processSlash(const std::vector<glm::vec2>& trail,
                       const glm::mat4& projection,
                       const glm::mat4& view,
                       FocusBox& focusBox,
                       std::vector<Ingredient>& ingredients,
-                      std::vector<std::string>& ingredientIds,   // <--- AGGIUNTO
+                      std::vector<std::string>& ingredientIds,   
                       std::vector<SlashEffect>& activeCuts,
                       const Screen& screen,
                       double now,
@@ -76,6 +74,6 @@ private:
 
     int m_score{0};
     int m_lives{3};
-    std::unordered_map<std::string,int> m_required;   // ID -> qty richiesta
-    std::unordered_map<std::string,int> m_collected;  // ID -> qty raccolta
+    std::unordered_map<std::string,int> m_required;   
+    std::unordered_map<std::string,int> m_collected;  
 };

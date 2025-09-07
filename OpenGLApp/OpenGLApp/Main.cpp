@@ -9,13 +9,9 @@
 #include <fstream>
 #include <string>
 #include <random>
-#include <limits>
 #include <vector>
 #include <unordered_map>
 #include <memory>
-
-#include <ft2build.h>
-#include FT_FREETYPE_H
 
 #include "shader.h"
 #include "camera.h"
@@ -31,23 +27,15 @@
 #include "Effects.h"
 #include "GameState.h"
 
-// -----------------------------------------------------------------------------
-// Prototipi
-// -----------------------------------------------------------------------------
 void OnFramebufferSize(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window, FocusBox& focusBox);
 void character_callback(GLFWwindow* window, unsigned int codepoint);
 bool customWindowShouldClose(GLFWwindow* window);
-void SpawnRandomIngredient();
 void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
-                                 std::vector<std::string>& ingredientIds);
+                                 std::vector<std::string>& ingredientIds, int currentLevel);
 
-
-// -----------------------------------------------------------------------------
-// Stato globale (ordinato: prima Screen, poi variabili che lo usano)
-// -----------------------------------------------------------------------------
 Screen screen = Screen::S16_9();
 
 float lastX = screen.w / 2.0f;
@@ -70,7 +58,6 @@ TextRenderer textRenderer;
 
 bool endGame = false;
 std::string inputName = "";
-bool isTypingName = false;
 
 bool fullscreen = false;
 
@@ -96,7 +83,7 @@ bool isDragging = false;
 unsigned int trailVAO = 0, trailVBO = 0;
 Shader* trailShader = nullptr;
 
-// gioco
+
 GameState gameState = GameState::START;
 std::vector<Ingredient> ingredients;
 
@@ -108,15 +95,13 @@ static float frand(float a, float b) {
 	return d(gen);
 }
 
-// -----------------------------------------------------------------------------
-// Funzioni di supporto
-// -----------------------------------------------------------------------------
+//Funzioni
 bool customWindowShouldClose(GLFWwindow* window) {
     return glfwWindowShouldClose(window);
 }
 
 void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
-                                 std::vector<std::string>& ingredientIds)
+                                 std::vector<std::string>& ingredientIds, int currentLevel)
 {
     struct SpawnDef {
         const char* path;
@@ -149,7 +134,7 @@ void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
     static const SpawnDef kHeart = { "resources/ingredients/heart/heart.obj","heart", 28.0f, false };
 
     // ------------------ difficoltà in base al livello ------------------
-    int currentLevel; 
+ 
     const int lvl = std::max(1, currentLevel);
 
     // Probabilità (percento)
@@ -167,13 +152,13 @@ void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
         chosen = kBomb;
     }
 	else {
-		// Costruisci lista pesata ingredienti in base a quanto richiesto nella ricetta corrente
+		
 		std::vector<double> weights;
 		weights.reserve(kNonBomb.size());
 
 		for (const auto& def : kNonBomb) {
 			int qty = scoreManager.getRequiredQty(def.id);
-			// Se l’ingrediente è richiesto nella ricetta → peso maggiore
+			//ingredienti ricetta pesano di più (1 + 2 * qty)
 			double w = (qty > 0) ? (1.0 + qty * 2.0) : 1.0;
 			weights.push_back(w);
 		}
@@ -183,7 +168,7 @@ void SpawnRandomIngredientWithId(std::vector<Ingredient>& ingredients,
 	}
 
     // ------------------ spawn point e direzione ------------------
-    glm::vec2 spawn = Ingredient::RandomSpawnPoint(); // ora spawna dai 4 lati (come hai messo)
+    glm::vec2 spawn = Ingredient::RandomSpawnPoint();
 
 	glm::vec2 target = { frand(0.0f, screen.w), frand(0.0f, screen.h) };
 
@@ -215,10 +200,9 @@ void character_callback(GLFWwindow* window, unsigned int codepoint) {
             inputName += static_cast<char>(codepoint);
         }
     }
-    // Nota: niente gestione BACKSPACE qui; la fai già nel ramo NAME_INPUT
 }
 
-// Crea i punti di un contorno rettangolare con angoli smussati
+// contorno rettangolare con angoli smussati
 static void buildRoundedRectOutline(float x, float y, float w, float h,
     float r, int segs, std::vector<glm::vec2>& out)
 {
@@ -246,9 +230,7 @@ static void buildRoundedRectOutline(float x, float y, float w, float h,
     // chiudi la strip tornando al primo punto
     out.push_back(out.front());
 }
-// -----------------------------------------------------------------------------
-// main
-// -----------------------------------------------------------------------------
+
 int main() {
     // glfw: init
     glfwInit();
@@ -321,7 +303,6 @@ int main() {
 	// -------------------------
 	Shader ourShader("shader.vs", "shader.fs");
 	//shader per focus box
-	Shader focusShader("focusbox.vs", "focusbox.fs");
 	Shader blurShader("shader.vs", "shader_blur.fs");
 	Shader objBlurShader("shader.vs", "shader_blur_objs.fs");
 	// load models
@@ -362,7 +343,7 @@ int main() {
 
 
 	// vettore parallelo agli ingredienti per tenerne l'ID
-	std::vector<std::string> ingredientIds;                 // <--- AGGIUNTO
+	std::vector<std::string> ingredientIds;                 
 	std::vector<std::string> recipeIds;
 
 	std::vector<std::unordered_map<std::string,int>> levelRecipes = {
@@ -386,8 +367,6 @@ int main() {
 
    
 	glm::vec2 baseSize = glm::vec2(100.0f, 50.0f);
-	float spacing = 100.0f;
-
 	float playYScale = 2.0f;
 	float scoresYScale = 2.0f;
 	float infoYScale = 2.0f;
@@ -475,7 +454,6 @@ int main() {
 
 			glm::mat4 m(1.0f);
 			m = glm::translate(m, glm::vec3(screen.w * 0.5f, screen.h * 0.5f, 0.0f));
-			// Se il modello è un quad unitario centrato, questa scala lo “stira” esattamente alla finestra:
 			m = glm::scale(m, glm::vec3(screen.w, screen.h, 1.0f));
 			ourShader.setMat4("model", m);
 			startBackground.Draw(ourShader);
@@ -503,7 +481,6 @@ int main() {
 
 			blurShader.setVec2("rectMin", glm::vec2(-1.0f, -1.0f));
     		blurShader.setVec2("rectMax", glm::vec2(-1.0f, -1.0f));
-			// se usi il focus blur anche qui, ripeti il setup del rect (facoltativo)
 			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
 			blurShader.setMat4("projection", orthoProj);
 			blurShader.setMat4("view", glm::mat4(1.0f));
@@ -516,7 +493,7 @@ int main() {
 			blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
 			backgroundPlane.Draw(blurShader);
 
-			// -- mostra ricetta1.obj in ortho centrato --
+			// -- mostra ricetta1.obj 
 			glDisable(GL_DEPTH_TEST);
 			ourShader.use();
 			ourShader.setMat4("projection", orthoProj);
@@ -541,7 +518,7 @@ int main() {
 
 			// dopo 3s vai a PLAYING
 			if (now - recipeStartTime >= kRecipePreview) {
-				spawnTimer = 0.0f;              // così lo spawn parte “fresco”
+				spawnTimer = 0.0f;              
 				glEnable(GL_DEPTH_TEST);
 				gameState = GameState::PLAYING;
 				continue;                       // passa subito al frame PLAYING
@@ -551,7 +528,7 @@ int main() {
         else if (gameState == GameState::PLAYING) {
 			const double now = glfwGetTime();
 
-			// --- Blur pass + focus rect (invariato) ---
+			// --- Blur pass + focus rect---
 			blurShader.use();
 			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
 
@@ -568,7 +545,7 @@ int main() {
 
 			glDisable(GL_DEPTH_TEST);
 
-			// --- Background (invariato) ---
+			// --- Background ---
 			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
 			blurShader.setMat4("projection", orthoProj);
 			blurShader.setMat4("view", glm::mat4(1.0f));
@@ -582,16 +559,14 @@ int main() {
 			backgroundPlane.Draw(blurShader);
 
 
-			// --- Matrici per ingredienti (invariato) ---
+			// --- Matrici per ingredienti ---
 			glm::mat4 ingProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
 			glm::mat4 ingView(1.0f);
-			glm::mat4 perspectiveProj = glm::perspective(glm::radians(camera.Zoom), (float)screen.w / (float)screen.h, 0.1f, 100.0f);
-			glm::mat4 view = camera.GetViewMatrix();
 			model = glm::scale(model, glm::vec3(20.0f));
 
 			spawnTimer += deltaTime;
 			if (spawnTimer >= spawnInterval) {
-				SpawnRandomIngredientWithId(ingredients, ingredientIds);
+				SpawnRandomIngredientWithId(ingredients, ingredientIds,currentLevel);
 				spawnTimer = 0.0f;
 			}
 
@@ -619,7 +594,7 @@ int main() {
 							// PASSA ANCHE ingredientIds
 							scoreManager.processSlash(
 								mouseTrail, ingProj, ingView, focusBox,
-								ingredients, ingredientIds,          // <-- CAMBIATO
+								ingredients, ingredientIds,          
 								activeCuts, screen, now, gameState
 							);
 						}
@@ -654,7 +629,7 @@ int main() {
 			}
 		
 
-			// --- UI: vite + punteggio (invariato) ---
+			// --- UI: vite + punteggio ---
 			glDisable(GL_DEPTH_TEST);
 			ourShader.use();
 			glm::mat4 uiProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
@@ -693,14 +668,13 @@ int main() {
 					// colore: bianco se ancora da prendere, verdino se completato
 					glm::vec3 col = (rem > 0) ? glm::vec3(1.0f) : glm::vec3(0.6f, 1.0f, 0.6f);
 
-					// es. "latte x1"
 					std::string line = id + " x" + std::to_string(rem);
 					textRenderer.DrawText(textShader, line, startX, y, 0.5f, col);
 					y -= lineStep;
 				}
 			}
 
-			// --- Disegno scia mouse + processSlash in drag (passa ingredientIds) ---
+			// --- Disegno scia mouse + processSlash in drag ---
 			if (isDragging && mouseTrail.size() >= 2) {
 				// 1) scia
 				trailShader->use();
@@ -718,12 +692,12 @@ int main() {
 				// 2) processa il taglio
 				scoreManager.processSlash(
 					mouseTrail, ingProj, ingView, focusBox,
-					ingredients, ingredientIds,              // <-- CAMBIATO
+					ingredients, ingredientIds,            
 					activeCuts, screen, now, gameState
 				);
 			}
 
-			// --- Effetti taglio (invariato) ---
+			// --- Effetti taglio) ---
 			glLineWidth(4.0f);
 			trailShader->use();
 			trailShader->setVec3("trailColor", glm::vec3(1.0f, 1.0f, 0.4f));
@@ -751,7 +725,7 @@ int main() {
 		else if (gameState == GameState::CONGRATULATIONS) {
 			const double now = glfwGetTime();
 
-			// background (riusa quello di PLAYING)
+			// background
 			blurShader.use();
 			blurShader.setVec2("uTexelSize", glm::vec2(1.0f / screen.w, 1.0f / screen.h));
 			
@@ -770,7 +744,7 @@ int main() {
 			blurShader.setVec3("diffuseColor", glm::vec3(1.0f));
 			backgroundPlane.Draw(blurShader);
 
-			// Mostra il modello del livello corrente (niente testo)
+			
 			glDisable(GL_DEPTH_TEST);
 			ourShader.use();
 			ourShader.setMat4("projection", orthoProj);
@@ -784,15 +758,13 @@ int main() {
 			lm = glm::scale(lm, glm::vec3(s, s, 1.0f));
 			ourShader.setMat4("model", lm);
 
-			// Disegna "resources/levels/livelloX.obj"
 			if (currentLevel >= 1 && currentLevel <= (int)levelModels.size()) {
 				levelModels[currentLevel - 1]->Draw(ourShader);
 			}
 
-			// entra in congrats al primo frame
 			if (congratsStartTime == 0.0) congratsStartTime = now;
 
-			// dopo 5s, passa al livello successivo o a NAME_INPUT
+			// dopo 5s
 			if (now - congratsStartTime >= kCongratsTime) {
 				congratsStartTime = 0.0;
 				if (currentLevel >= 10) {
@@ -816,7 +788,6 @@ int main() {
         else if (gameState == GameState::SCORES) {
 			
 			ourShader.use();
-			////////////////////////
 			glDisable(GL_DEPTH_TEST);
 
 			glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
@@ -828,15 +799,15 @@ int main() {
 			model = glm::translate(model, glm::vec3(screen.w / 2.0f, screen.h / 2.0f, 0.0f));
 			model = glm::scale(model, glm::vec3(screen.w / 3.2f, screen.h / 1.8f, 1.0f));
 			ourShader.setMat4("model", model);
-			ourShader.setBool("hasTexture", true);  // background ha texture
-			ourShader.setVec3("diffuseColor", glm::vec3(2.0f)); // fallback nel caso
+			ourShader.setBool("hasTexture", true);  
+			ourShader.setVec3("diffuseColor", glm::vec3(2.0f)); 
 			backgroundPlane.Draw(ourShader);
 			
 			// 1) Posizionamento pergamena
 	
             // 0) stato GL sicuro
             glDisable(GL_DEPTH_TEST);
-            glDisable(GL_CULL_FACE);                 // evita scomparse per winding
+            glDisable(GL_CULL_FACE);                 
             
             ourShader.use();
             orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
@@ -851,18 +822,16 @@ int main() {
             float kW = 0.3f;
             glm::mat4 pm(1.0f);
             pm = glm::translate(pm, glm::vec3(pX + pW * 0.5f, pY + pH * 0.5f, 0.0f));
-            pm = glm::scale(pm, glm::vec3(pW * kW, pH * kH, 1.0f));  // SCALA DELL’OBJ
+            pm = glm::scale(pm, glm::vec3(pW * kW, pH * kH, 1.0f));  
             ourShader.setMat4("model", pm);
-
-            // vogliamo vedere la TEXTURE della pergamena (se l’OBJ/MTL la fornisce)
             ourShader.setBool("hasTexture", true);
-            ourShader.setVec3("diffuseColor", glm::vec3(1.0f));  // nessun tint
+            ourShader.setVec3("diffuseColor", glm::vec3(1.0f));  
             parchment.Draw(ourShader);
 			
             // ---------------------------
             // 2) Area interna di scrittura
             // ---------------------------
-             // Padding per stare dentro alla pergamena (regola a gusto)
+             // Padding per stare dentro alla pergamena
             float padL = 160.0f, padR = 90.0f, padT = 90.0f, padB = 60.0f;
             float innerX = pX + padL;
             float innerY = pY + padB;
@@ -952,25 +921,19 @@ int main() {
 
             float rowH = 62.0f;
             float xRank = innerX + 8.0f;
-            float xAvatar = xRank;
-            float avatarSize = 48.0f;
-            float xName = xAvatar + avatarSize + 12.0f;
+            float xName =60.0f+xRank;
             float pillW = 110.0f;
             float xScore = innerX + innerW - pillW - 50.0f;
 
-            // baseline della PRIMA riga (subito sotto listTop).
-            // NOTA direzione: con la formula qui sotto, se scoreScrollOffset aumenta, le righe SCENDONO.
             float y = listTop - rowH + scoreScrollOffset;
 
             int index = 1;
             for (const auto& entry : scores) {
-                // (Ottimizzazione) salta righe completamente fuori dal clip verticale
                 if (y + rowH <= listBottom || y >= listTop) {
                     y -= rowH;
                     index++;
-                    continue;  // fuori dall'area: non disegniamo (ottimizzazione)
+                    continue; 
                 }
-                // Riga alternata chiara
                 ourShader.use();
                 ourShader.setMat4("projection", orthoProj);
                 ourShader.setMat4("view", glm::mat4(1.0f));
@@ -978,17 +941,7 @@ int main() {
                 ourShader.setVec3("diffuseColor", (index % 2 == 0) ? glm::vec3(1.0f, 1.0f, 1.0f)
                     : glm::vec3(0.98f, 0.96f, 0.92f));
                 
-                // Separatore 
-                float sepMargin = 180.0f;                  // <-- regola quanto "accorciare"
-                float sepW = bw - sepMargin;
-
-                glm::mat4 sm(1.0f);
-                sm = glm::translate(sm, glm::vec3(innerX + sepW, y + 2.0f, 0.0f));
-                sm = glm::scale(sm, glm::vec3(sepW, 2.0f, 1.0f));
-                ourShader.setMat4("model", sm);
-                ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-                //backgroundPlane.Draw(ourShader);
-               
+                     
                 textRenderer.DrawText(textShader, std::to_string(index), xRank + 30 , y + 18.0f, 0.9f, glm::vec3(0.12f, 0.08f, 0.06f));
 
              
@@ -1033,7 +986,7 @@ int main() {
 			textShader.use();
 			textShader.setMat4("projection", orthoProj);
 
-			// Helper per misurare la larghezza del testo in pixel (usa l'Advance dei glifi)
+			// Helper per misurare la larghezza del testo in pixel
 			auto textWidthPx = [&](const std::string& s, float scale) -> float {
 				float w = 0.0f;
 				for (char c : s) {
@@ -1275,7 +1228,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     if (gameState == GameState::SCORES) {
-        // Rotellina GIU' (yoffset < 0) -> contenuto scende -> offset AUMENTA
+        // Rotellina
         scoreScrollOffset -= (float)yoffset * 30.0f;
 
         // Clamp dinamico: totale righe - area visibile pergamena
@@ -1285,7 +1238,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
         float rowH = 62.0f;
         float total = (float)scores.size() * rowH;
 
-        // Deve combaciare con l'innerH - headerH usati nel render
         float pH = screen.h * 0.72f;
         float padT = 90.0f, padB = 60.0f, headerH = 56.0f;
         float visible = (pH - (padT + padB)) - headerH;
