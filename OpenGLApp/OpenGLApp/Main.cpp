@@ -13,6 +13,9 @@
 #include <unordered_map>
 #include <memory>
 
+//sound
+#include <irrKlang.h>
+
 #include "shader.h"
 #include "camera.h"
 #include "model.h"
@@ -94,6 +97,9 @@ static float frand(float a, float b) {
 	std::uniform_real_distribution<float> d(a, b);
 	return d(gen);
 }
+
+//sound
+irrklang::ISoundEngine* engine;
 
 //Funzioni
 bool customWindowShouldClose(GLFWwindow* window) {
@@ -268,6 +274,13 @@ int main() {
         return -1;
     }
 
+	//sound
+	engine = irrklang::createIrrKlangDevice();
+	if (!engine)
+		return 0; // error starting up the engine
+
+	engine->play2D("resources/sounds/bgmusic.ogg", true);
+
     // line shader per scie
     trailShader = new Shader("mouseTrail.vs", "mouseTrail.fs");
     glGenVertexArrays(1, &trailVAO);
@@ -439,6 +452,8 @@ int main() {
             }
         }
 		else if (gameState == GameState::START) {
+			focusBox.resetSize();
+
 			const double now = glfwGetTime();
 			glDisable(GL_DEPTH_TEST);
 
@@ -473,6 +488,8 @@ int main() {
 		}
 
 		else if (gameState == GameState::RECIPE) {
+			focusBox.resetSize();
+
 			const double now = glfwGetTime();
 
 			// -- background come in PLAYING --
@@ -524,7 +541,6 @@ int main() {
 				continue;                       // passa subito al frame PLAYING
 			}
 		}
-
         else if (gameState == GameState::PLAYING) {
 			const double now = glfwGetTime();
 
@@ -658,7 +674,7 @@ int main() {
 			{
 				const float startX = screen.w - 180.0f;   // allinea con lo "Score"
 				float y = screen.h - 110.0f;              // un po' sotto la riga dello score
-				const float lineStep = 30.0f;             // distanza tra righe
+				const float lineStep = 30.0f;             
 
 				for (const auto& id : recipeIds) {
 					int req = scoreManager.getRequiredQty(id);
@@ -721,7 +737,6 @@ int main() {
 
 			glEnable(GL_DEPTH_TEST);
 		}
-
 		else if (gameState == GameState::CONGRATULATIONS) {
 			const double now = glfwGetTime();
 
@@ -783,8 +798,6 @@ int main() {
 				}
 			}
 		}
-
-
         else if (gameState == GameState::SCORES) {
 			
 			ourShader.use();

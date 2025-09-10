@@ -150,7 +150,7 @@ public:
             return &model.textures_loaded[0];
         return nullptr;
     }
-  bool IsBomb() const { return isBomb_; }
+    bool IsBomb() const { return isBomb_; }
 private:
     float scaleFactor;
     Model model;

@@ -12,6 +12,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "irrKlang.h"
+
+extern irrklang::ISoundEngine* engine;
+
 void ScoreManager::loseLife(int n, GameState& gameState) {
     m_lives = std::max(0, m_lives - n);
     if (m_lives == 0) {
@@ -84,15 +88,22 @@ void ScoreManager::processSlash(const std::vector<glm::vec2>& trail,
             // --- REGOLE DI PUNTEGGIO/VITE ---
             if (it->IsBomb()) {
                 // Bomba: vita -1 ovunque
+                engine->play2D("resources/sounds/bomb.ogg");
                 loseLife(1, gameState);
             }
             else if (id == "lim_marcio" || id == "cioc_marcio") {
                 // Marci: -2 SEMPRE (anche fuori focus)
+                engine->play2D("resources/sounds/malus.ogg");
+                focusBox.reduceSize();
                 addScore(-2);
             }
             else if (id == "mela_oro" || id == "fragola_oro") {
                 // Oro: +3 SOLO se in focus, altrimenti -1
-                if (inFocus) addScore(+3);
+                if (inFocus) {
+                    focusBox.increaseSize();
+                    engine->play2D("resources/sounds/bonus.ogg");
+                    addScore(+3);
+                }
                 else addScore(-1);
             }
             else if (id == "heart") {

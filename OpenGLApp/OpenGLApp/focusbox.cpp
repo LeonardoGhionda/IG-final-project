@@ -9,6 +9,7 @@
 extern Screen screen;
 
 FocusBox::FocusBox(const glm::vec2& size) : size(size), center(0.0f, 0.0f) {
+    inital_size = size;
     InitRenderData();
 }
 
@@ -119,4 +120,23 @@ glm::vec2 FocusBox::getScaledSize()
 {
     glm::vec2 screenScale = screen.scaleFactor();
     return glm::vec2(size.x * screenScale.x, size.y * screenScale.y);
+}
+
+void FocusBox::resetSize() {
+    size = inital_size;
+    size_cnt = 0;
+}
+
+void FocusBox::increaseSize() {
+    if (size_cnt < 2) {
+        size *= 1.2f;
+        size_cnt++;
+    }  
+}
+
+void FocusBox::reduceSize() {
+    if (size_cnt > -2) {
+        size *= 0.8f;
+        size_cnt--;
+    }
 }

@@ -16,10 +16,14 @@ class FocusBox {
         bool IsActive() const;
         void printOnClick();
         glm::vec2 getScaledSize();
+        void resetSize();
+        void increaseSize();
+        void reduceSize();
 
     private:
+        int size_cnt = 0;
         glm::vec2 center;
-        glm::vec2 size;
+        glm::vec2 size, inital_size;
         unsigned int VAO, VBO;
         void InitRenderData();
 };
