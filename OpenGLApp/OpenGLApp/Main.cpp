@@ -29,6 +29,7 @@
 #include "button.h"
 #include "Effects.h"
 #include "GameState.h"
+#include "backbutton.h"
 
 void OnFramebufferSize(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -318,6 +319,8 @@ int main() {
 	//shader per focus box
 	Shader blurShader("shader.vs", "shader_blur.fs");
 	Shader objBlurShader("shader.vs", "shader_blur_objs.fs");
+	Shader lambertShader("lambert.vs", "lambert.fs");
+	Shader uiShader("ui.vs", "ui.fs");
 	// load models
 	// -----------
 	Model backgroundPlane("resources/background/table.obj");
@@ -329,6 +332,7 @@ int main() {
 	Model pauseModel("resources/levels/pause.obj");
 	Model rulesModel("resources/recipes/rules.obj");
 	Model startBackground("resources/background/startBackground.obj");
+	Model apple3d("resources/3d/apple3d.obj");
 
 	std::vector<Model> recipeModels;
 	recipeModels.reserve(10);
@@ -343,7 +347,6 @@ int main() {
 		std::string p = "resources/levels/livello" + std::to_string(i) + ".obj";
 		levelModels.emplace_back(std::make_unique<Model>(p.c_str()));
 	}
-
 
 	// durata anteprima ricetta
 	constexpr double kRecipePreview = 10.0;  
@@ -388,7 +391,25 @@ int main() {
     Button scoresButton{glm::vec2(0.5f, 0.50f), baseSize, scoresYScale, "SCORES" };
     Button infoButton{  glm::vec2(0.5f, 0.25f), baseSize, infoYScale,   "INFO"   };
 
-    // loop
+	//backbutton
+	BackButton backButton("resources/buttons/backbutton.png", glm::vec2(64.0f, 64.0f), glm::vec2(screen.w, screen.h));
+
+	//APPLE INITIALIZATION
+	glm::mat4 apple_mat = glm::mat4(1.0f);
+	//pos
+	glm::vec3 apple_dir = glm::normalize(glm::vec3(1.0f, 1.0f, 0.0f));
+	apple_mat = glm::translate(apple_mat, glm::vec3(10.0f, 10.0f, 0.0f));
+	//scale
+	float base_scale = screen.w / screen.ARW;
+	apple_mat = glm::scale(apple_mat, glm::vec3(base_scale * 20.0f));
+	// posizione iniziale
+	glm::vec3 apple_pos = glm::vec3(10.0f, 10.0f, 0.0f);
+	// accumulatore per rotazione
+	float apple_angle_accum = 0.0f;
+	// asse di rotazione (fisso o random)
+	glm::vec3 apple_axis = glm::normalize(glm::vec3(1.0f, 0.8f, 0.6f));
+
+    // MAIN LOOP
     while (!customWindowShouldClose(window)) {
         float currentFrame = (float)glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -403,7 +424,7 @@ int main() {
             ourShader.use();
             glDisable(GL_DEPTH_TEST);
 
-            glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -10.0f, 10.0f);
+            glm::mat4 orthoProj = glm::ortho(0.0f, (float)screen.w, 0.0f, (float)screen.h, -1000.0f, 1000.0f);
             ourShader.setMat4("projection", orthoProj);
             ourShader.setMat4("view", glm::mat4(1.0f));
 
@@ -414,7 +435,48 @@ int main() {
             ourShader.setMat4("model", model);
             ourShader.setBool("hasTexture", true);
             ourShader.setVec3("diffuseColor", glm::vec3(1.0f));
-            backgroundPlane.Draw(ourShader);
+			backgroundPlane.Draw(ourShader);
+
+			//APPLE
+			lambertShader.use();
+			//rotazione
+			apple_angle_accum += glm::radians(50.0f) * deltaTime;
+			//rimbalzi
+			if (apple_pos.x > screen.w || apple_pos.x < 0.0f)
+				apple_dir.x *= -1.0f;
+			if (apple_pos.y > screen.h || apple_pos.y < 0.0f)
+				apple_dir.y *= -1.0f;
+
+			//posizione
+			float apple_speed = 50.0f; // pixel al secondo
+			apple_pos += apple_dir * apple_speed * deltaTime;
+			glm::mat4 apple_mat = glm::mat4(1.0f);
+			//traslzione
+			apple_mat = glm::translate(apple_mat, apple_pos);
+			// rotazione attorno al proprio asse
+			apple_mat = glm::rotate(apple_mat, apple_angle_accum, apple_axis);
+			// scala
+			float base_scale = screen.w / screen.ARW;
+			apple_mat = glm::scale(apple_mat, glm::vec3(base_scale * 20.0f));
+
+			lambertShader.setMat4("model", apple_mat);
+			lambertShader.setMat4("projection", orthoProj);
+			lambertShader.setMat4("view", glm::mat4(1.0f));
+			lambertShader.setBool("hasTexture", true);
+			lambertShader.setVec3("diffuseColor", glm::vec3(1.0f));
+			lambertShader.setVec3("lightPos", glm::vec3((float)screen.w / 2, (float)screen.h / 2, 4));
+
+			// se la mela ha texture
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, apple3d.textures_loaded[0].id);
+			lambertShader.setInt("diffuseMap", 0);
+
+			// attiva il depth test così la mela si occlude correttamente
+			glEnable(GL_DEPTH_TEST);
+			apple3d.Draw(lambertShader);
+			glDisable(GL_DEPTH_TEST);
+
+			ourShader.use();
 
 			//aggiorna hover
 			playButton.UpdateHover(mousePos);
@@ -968,12 +1030,18 @@ int main() {
                 index++;
             }
             glDisable(GL_SCISSOR_TEST);
-
+					
            
             if (textRenderer.Characters.empty()) {
                 std::cerr << "Font non inizializzato!\n";
                 continue;
             }
+
+			//backbutton
+			glDisable(GL_DEPTH_TEST);
+			backButton.ProcessInput(window, glm::vec2(screen.w, screen.h), GameState::MENU);
+			backButton.Draw(uiShader, glm::vec2(screen.w, screen.h));
+			glEnable(GL_DEPTH_TEST);
 
 		}
 		else if (gameState == GameState::NAME_INPUT) {
@@ -1106,6 +1174,11 @@ int main() {
 			ourShader.setMat4("model", m);
 
 			rulesModel.Draw(ourShader);
+			glEnable(GL_DEPTH_TEST);
+
+			glDisable(GL_DEPTH_TEST);
+			backButton.ProcessInput(window, glm::vec2(screen.w, screen.h), GameState::MENU);
+			backButton.Draw(uiShader, glm::vec2(screen.w, screen.h));
 			glEnable(GL_DEPTH_TEST);
 		}
 

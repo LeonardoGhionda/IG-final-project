@@ -77,6 +77,9 @@
     <ClInclude Include="button.h">
       <Filter>File di intestazione</Filter>
     </ClInclude>
+    <ClInclude Include="backbutton.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader.fs">
@@ -87,6 +90,10 @@
     </None>
     <None Include="shader_blur.fs" />
     <None Include="shader_blur_objs.fs" />
+    <None Include="lambert.vs" />
+    <None Include="lambert.fs" />
+    <None Include="ui.vs" />
+    <None Include="ui.fs" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="score.txt" />

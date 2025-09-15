@@ -157,6 +157,7 @@
     <ClCompile Include="TextRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="backbutton.h" />
     <ClInclude Include="button.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="focusbox.h" />
@@ -172,6 +173,8 @@
     <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="lambert.fs" />
+    <None Include="lambert.vs" />
     <None Include="shader.fs">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </ExcludedFromBuild>
@@ -183,6 +186,8 @@
     </None>
     <None Include="shader_blur.fs" />
     <None Include="shader_blur_objs.fs" />
+    <None Include="ui.fs" />
+    <None Include="ui.vs" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="score.txt" />
