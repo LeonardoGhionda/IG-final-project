@@ -318,7 +318,7 @@ int main() {
 	Shader ourShader("shader.vs", "shader.fs");
 	//shader per focus box
 	Shader blurShader("shader.vs", "shader_blur.fs");
-	Shader objBlurShader("shader.vs", "shader_blur_objs.fs");
+	Shader objBlurShader("objShader.vs", "shader_blur_objs.fs");
 	Shader lambertShader("lambert.vs", "lambert.fs");
 	Shader uiShader("ui.vs", "ui.fs");
 	// load models

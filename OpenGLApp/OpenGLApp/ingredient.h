@@ -42,8 +42,6 @@ public:
 
     void Draw(Shader shader) { 
         model.Draw(shader); 
-       
-
     }
 
     glm::mat4 GetModelMatrix() const {

@@ -175,6 +175,7 @@
   <ItemGroup>
     <None Include="lambert.fs" />
     <None Include="lambert.vs" />
+    <None Include="objShader.vs" />
     <None Include="shader.fs">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </ExcludedFromBuild>

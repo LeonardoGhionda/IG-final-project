@@ -94,6 +94,7 @@
     <None Include="lambert.fs" />
     <None Include="ui.vs" />
     <None Include="ui.fs" />
+    <None Include="objShader.vs" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="score.txt" />
